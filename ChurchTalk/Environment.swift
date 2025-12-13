@@ -20,9 +20,9 @@ enum AppEnvironment: String {
         case .development:
             return "http://localhost:8000/api/v1"
         case .staging:
-            return "https://api-staging.churchtalk.app/api/v1"
+            return "https://api-staging.churchtalk.ai/api/v1"
         case .production:
-            return "https://api.churchtalk.app/api/v1"
+            return "https://api.churchtalk.ai/api/v1"
         }
     }
 
