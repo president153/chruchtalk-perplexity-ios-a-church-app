@@ -6,10 +6,13 @@
 //
 
 import SwiftUI
+import UserNotifications
 
 @main
 struct ChurchTalkApp: App {
+    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var authViewModel = AuthViewModel()
+    @StateObject private var notificationService = NotificationService.shared
     @State private var showSplash = true
 
     var body: some Scene {
@@ -36,6 +39,10 @@ struct ChurchTalkApp: App {
                         // Fully authenticated - show main app
                         MainTabView()
                             .environmentObject(authViewModel)
+                            .task {
+                                // Request notification permission after login
+                                await requestNotificationPermission()
+                            }
                     }
                 } else {
                     // Not authenticated - show onboarding
@@ -45,6 +52,16 @@ struct ChurchTalkApp: App {
             }
             .animation(.easeInOut(duration: 0.3), value: authViewModel.isAuthenticated)
             .animation(.easeInOut(duration: 0.3), value: authViewModel.isPendingApproval)
+        }
+    }
+
+    private func requestNotificationPermission() async {
+        let granted = await notificationService.requestPermission()
+        if granted {
+            // Register for remote notifications on main thread
+            await MainActor.run {
+                UIApplication.shared.registerForRemoteNotifications()
+            }
         }
     }
 }

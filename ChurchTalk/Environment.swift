@@ -52,7 +52,7 @@ enum AppEnvironment: String {
 }
 
 /// Global environment configuration
-struct Environment {
+struct AppConfig {
     /// Current app environment
     static let current = AppEnvironment.current
 

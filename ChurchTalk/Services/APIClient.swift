@@ -69,8 +69,8 @@ class APIClient {
 
     private init() {
         // Use environment configuration for API URL and demo mode
-        self.baseURL = Environment.apiBaseURL
-        self.isDemoMode = Environment.isDemoMode
+        self.baseURL = AppConfig.apiBaseURL
+        self.isDemoMode = AppConfig.isDemoMode
     }
 
     // MARK: - JSON Decoder
@@ -223,6 +223,21 @@ class APIClient {
     /// Perform a DELETE request with no response body
     func delete(_ endpoint: String) async throws {
         let request = try buildRequest(endpoint: endpoint, method: .delete)
+        let (_, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw APIError.requestFailed(statusCode: 0)
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            throw APIError.requestFailed(statusCode: httpResponse.statusCode)
+        }
+    }
+
+    /// Perform a POST request with body, no response expected
+    func postVoid<B: Encodable>(_ endpoint: String, body: B) async throws {
+        let bodyData = try encoder.encode(body)
+        let request = try buildRequest(endpoint: endpoint, method: .post, body: bodyData)
         let (_, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {

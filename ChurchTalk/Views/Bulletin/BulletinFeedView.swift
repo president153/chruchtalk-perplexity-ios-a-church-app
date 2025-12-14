@@ -2,44 +2,69 @@ import SwiftUI
 
 struct BulletinFeedView: View {
     @State private var posts: [BulletinPost] = []
-
-    // Demo data
-    let demoPosts: [BulletinPost] = [
-        BulletinPost(
-            id: "1",
-            title: "Sunday Service Highlights",
-            content: "What an incredible Sunday! Pastor John shared a powerful message from John 3:16 about God's unconditional love.",
-            author: Member(id: "1", firstName: "Pastor", lastName: "John", email: "pastor@church.org", churchId: "1"),
-            mediaUrls: [],
-            youtubeUrl: "https://youtube.com/watch?v=example",
-            publishedAt: Date().addingTimeInterval(-7200),
-            reactions: Reactions(like: 42, pray: 18, amen: 25),
-            commentCount: 12
-        ),
-        BulletinPost(
-            id: "2",
-            title: "Youth Night This Friday!",
-            content: "Join us for an amazing night of worship, games, and fellowship! All teens grades 6-12 welcome.",
-            author: Member(id: "2", firstName: "Sarah", lastName: "Williams", email: "sarah@church.org", churchId: "1"),
-            mediaUrls: [],
-            publishedAt: Date().addingTimeInterval(-86400),
-            reactions: Reactions(like: 28, pray: 5, amen: 15),
-            commentCount: 8
-        ),
-    ]
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+    @State private var impressionTracker = ImpressionTracker()
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                LazyVStack(spacing: 16) {
-                    ForEach(demoPosts) { post in
-                        NavigationLink(destination: BulletinDetailView(post: post)) {
-                            BulletinPostCard(post: post)
+            Group {
+                if isLoading {
+                    VStack {
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Text("Loading posts...")
+                            .foregroundColor(.secondary)
+                            .padding(.top, 8)
+                    }
+                } else if let error = errorMessage {
+                    VStack(spacing: 16) {
+                        Image(systemName: "exclamationmark.triangle")
+                            .font(.system(size: 48))
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                        Button("Retry") {
+                            Task { await fetchPosts() }
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding()
+                } else if posts.isEmpty {
+                    VStack(spacing: 16) {
+                        Image(systemName: "newspaper")
+                            .font(.system(size: 48))
+                            .foregroundColor(.secondary)
+                        Text("No posts yet")
+                            .font(.headline)
+                        Text("Check back later for updates from your church")
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                    }
+                    .padding()
+                } else {
+                    ScrollView {
+                        LazyVStack(spacing: 16) {
+                            ForEach(posts) { post in
+                                NavigationLink(destination: BulletinDetailView(post: post, source: .feed)) {
+                                    BulletinPostCard(post: post)
+                                        .onAppear {
+                                            // Track impression when post scrolls into view
+                                            impressionTracker.trackIfNeeded(postId: post.id)
+                                        }
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
+                        }
+                        .padding()
+                    }
+                    .refreshable {
+                        // Reset impressions on refresh
+                        impressionTracker.reset()
+                        await fetchPosts()
                     }
                 }
-                .padding()
             }
             .navigationTitle("Home")
             .toolbar {
@@ -51,12 +76,39 @@ struct BulletinFeedView: View {
                 }
             }
         }
+        .task {
+            await fetchPosts()
+        }
+    }
+
+    private func fetchPosts() async {
+        isLoading = posts.isEmpty
+        errorMessage = nil
+
+        do {
+            let fetchedPosts = try await BulletinAPI.shared.getPosts()
+            await MainActor.run {
+                posts = fetchedPosts
+                isLoading = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Failed to load posts: \(error.localizedDescription)"
+                isLoading = false
+            }
+        }
     }
 }
 
 struct BulletinPostCard: View {
     let post: BulletinPost
     @State private var userReaction: ReactionType? = nil
+    @State private var currentReactions: Reactions
+
+    init(post: BulletinPost) {
+        self.post = post
+        self._currentReactions = State(initialValue: post.reactions)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -116,16 +168,28 @@ struct BulletinPostCard: View {
 
             // Reactions Bar
             HStack(spacing: 24) {
-                ReactionButton(type: .like, count: post.reactions.like, isSelected: userReaction == .like) {
-                    userReaction = userReaction == .like ? nil : .like
+                ReactionButton(
+                    type: .like,
+                    count: currentReactions.like,
+                    isSelected: userReaction == .like
+                ) {
+                    Task { await toggleReaction(.like) }
                 }
 
-                ReactionButton(type: .pray, count: post.reactions.pray, isSelected: userReaction == .pray) {
-                    userReaction = userReaction == .pray ? nil : .pray
+                ReactionButton(
+                    type: .pray,
+                    count: currentReactions.pray,
+                    isSelected: userReaction == .pray
+                ) {
+                    Task { await toggleReaction(.pray) }
                 }
 
-                ReactionButton(type: .amen, count: post.reactions.amen, isSelected: userReaction == .amen) {
-                    userReaction = userReaction == .amen ? nil : .amen
+                ReactionButton(
+                    type: .amen,
+                    count: currentReactions.amen,
+                    isSelected: userReaction == .amen
+                ) {
+                    Task { await toggleReaction(.amen) }
                 }
 
                 Spacer()
@@ -142,6 +206,58 @@ struct BulletinPostCard: View {
         .background(Color(.systemBackground))
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 5, y: 2)
+    }
+
+    private func toggleReaction(_ type: ReactionType) async {
+        // Optimistic update
+        let previousReaction = userReaction
+        let previousReactions = currentReactions
+
+        if userReaction == type {
+            userReaction = nil
+            switch type {
+            case .like: currentReactions.like = max(0, currentReactions.like - 1)
+            case .pray: currentReactions.pray = max(0, currentReactions.pray - 1)
+            case .amen: currentReactions.amen = max(0, currentReactions.amen - 1)
+            }
+        } else {
+            // Remove previous reaction count
+            if let prev = previousReaction {
+                switch prev {
+                case .like: currentReactions.like = max(0, currentReactions.like - 1)
+                case .pray: currentReactions.pray = max(0, currentReactions.pray - 1)
+                case .amen: currentReactions.amen = max(0, currentReactions.amen - 1)
+                }
+            }
+            // Add new reaction
+            userReaction = type
+            switch type {
+            case .like: currentReactions.like += 1
+            case .pray: currentReactions.pray += 1
+            case .amen: currentReactions.amen += 1
+            }
+        }
+
+        // API call
+        do {
+            let response = try await BulletinAPI.shared.toggleReaction(
+                postId: post.id,
+                reactionType: type
+            )
+            await MainActor.run {
+                currentReactions = Reactions(
+                    like: response.reactions.like,
+                    pray: response.reactions.pray,
+                    amen: response.reactions.amen
+                )
+            }
+        } catch {
+            // Revert on error
+            await MainActor.run {
+                userReaction = previousReaction
+                currentReactions = previousReactions
+            }
+        }
     }
 }
 

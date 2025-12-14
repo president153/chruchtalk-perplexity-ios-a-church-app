@@ -2,93 +2,227 @@ import SwiftUI
 
 struct BulletinDetailView: View {
     let post: BulletinPost
+    let viewSource: ViewSource
     @State private var comments: [Comment] = []
     @State private var newCommentText = ""
     @FocusState private var isCommentFieldFocused: Bool
     @State private var userReaction: ReactionType? = nil
+    @State private var currentReactions: Reactions
 
-    // Demo comments
-    let demoComments: [Comment] = [
-        Comment(
-            id: "c1",
-            content: "Such an inspiring message! Really spoke to my heart.",
-            author: Member(id: "1", firstName: "Sarah", lastName: "Williams", email: "sarah@church.org", churchId: "1"),
-            createdAt: Date().addingTimeInterval(-1800),
-            postId: "1"
-        ),
-        Comment(
-            id: "c2",
-            content: "Can't wait for next Sunday!",
-            author: Member(id: "2", firstName: "Michael", lastName: "Chen", email: "michael@church.org", churchId: "1"),
-            createdAt: Date().addingTimeInterval(-3600),
-            postId: "1"
-        ),
-        Comment(
-            id: "c3",
-            content: "This message was exactly what I needed to hear today. God's timing is perfect!",
-            author: Member(id: "3", firstName: "Emily", lastName: "Johnson", email: "emily@church.org", churchId: "1"),
-            createdAt: Date().addingTimeInterval(-7200),
-            postId: "1"
-        ),
-    ]
+    // Loading states
+    @State private var isLoadingComments = true
+    @State private var isSubmittingComment = false
+    @State private var isTogglingReaction = false
+    @State private var errorMessage: String?
+
+    // View tracking
+    @State private var viewTracker: PostViewTracker?
+    @State private var viewStartTime: Date?
+
+    init(post: BulletinPost, source: ViewSource = .feed) {
+        self.post = post
+        self.viewSource = source
+        _currentReactions = State(initialValue: post.reactions)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     // Post Content (expanded)
-                    BulletinPostContent(post: post, userReaction: $userReaction)
+                    BulletinPostContent(
+                        post: post,
+                        userReaction: $userReaction,
+                        currentReactions: $currentReactions,
+                        isTogglingReaction: $isTogglingReaction,
+                        onReactionToggle: toggleReaction
+                    )
 
                     Divider()
                         .padding(.vertical, 8)
 
                     // Comments Section
-                    CommentsSection(comments: comments)
+                    CommentsSection(
+                        comments: comments,
+                        isLoading: isLoadingComments,
+                        errorMessage: errorMessage
+                    )
                 }
                 .padding()
+            }
+            .refreshable {
+                await loadComments()
             }
 
             // Comment Input Bar
             CommentInputBar(
                 text: $newCommentText,
                 isFocused: $isCommentFieldFocused,
+                isSubmitting: isSubmittingComment,
                 onSubmit: submitComment
             )
         }
         .navigationTitle("Post")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .navigationBarTrailing) {
+                ShareLink(
+                    item: post.title,
+                    subject: Text(post.title),
+                    message: Text(post.content.prefix(200) + "...")
+                ) {
+                    Image(systemName: "square.and.arrow.up")
+                }
+            }
+        }
+        .task {
+            await loadComments()
+        }
         .onAppear {
-            comments = demoComments
+            // Start tracking view
+            viewTracker = PostViewTracker(postId: post.id, source: viewSource)
+            viewTracker?.startTracking()
+            viewStartTime = Date()
+        }
+        .onDisappear {
+            // Stop tracking and record duration
+            let scrolledToBottom = false // Could track this with scroll position
+            viewTracker?.stopTracking(completed: scrolledToBottom)
+        }
+    }
+
+    private func loadComments() async {
+        isLoadingComments = true
+        errorMessage = nil
+
+        do {
+            let fetchedComments = try await BulletinAPI.shared.getComments(postId: post.id)
+            await MainActor.run {
+                comments = fetchedComments
+                isLoadingComments = false
+            }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Failed to load comments"
+                isLoadingComments = false
+            }
         }
     }
 
     private func submitComment() {
         guard !newCommentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
 
-        let newComment = Comment(
-            id: UUID().uuidString,
-            content: newCommentText,
-            author: Member(id: "current", firstName: "John", lastName: "Doe", email: "john@church.org", churchId: "1"),
-            createdAt: Date(),
-            postId: post.id
-        )
-
-        withAnimation(ChurchTalkAnimations.smooth) {
-            comments.insert(newComment, at: 0)
-        }
-
+        isSubmittingComment = true
+        let commentContent = newCommentText
         newCommentText = ""
         isCommentFieldFocused = false
+
+        Task {
+            do {
+                let newComment = try await BulletinAPI.shared.createComment(
+                    postId: post.id,
+                    content: commentContent
+                )
+
+                await MainActor.run {
+                    withAnimation(ChurchTalkAnimations.smooth) {
+                        comments.insert(newComment, at: 0)
+                    }
+                    isSubmittingComment = false
+
+                    // Haptic feedback
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                }
+            } catch {
+                await MainActor.run {
+                    newCommentText = commentContent // Restore text on failure
+                    isSubmittingComment = false
+
+                    // Error haptic
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
+            }
+        }
+    }
+
+    private func toggleReaction(_ type: ReactionType) {
+        guard !isTogglingReaction else { return }
+
+        isTogglingReaction = true
+
+        // Optimistic update
+        let previousReaction = userReaction
+        let previousReactions = currentReactions
+
+        withAnimation(ChurchTalkAnimations.bouncy) {
+            if userReaction == type {
+                userReaction = nil
+                // Decrement reaction count
+                switch type {
+                case .like: currentReactions = Reactions(like: max(0, currentReactions.like - 1), pray: currentReactions.pray, amen: currentReactions.amen)
+                case .pray: currentReactions = Reactions(like: currentReactions.like, pray: max(0, currentReactions.pray - 1), amen: currentReactions.amen)
+                case .amen: currentReactions = Reactions(like: currentReactions.like, pray: currentReactions.pray, amen: max(0, currentReactions.amen - 1))
+                }
+            } else {
+                // Remove previous reaction if exists
+                if let prev = userReaction {
+                    switch prev {
+                    case .like: currentReactions = Reactions(like: max(0, currentReactions.like - 1), pray: currentReactions.pray, amen: currentReactions.amen)
+                    case .pray: currentReactions = Reactions(like: currentReactions.like, pray: max(0, currentReactions.pray - 1), amen: currentReactions.amen)
+                    case .amen: currentReactions = Reactions(like: currentReactions.like, pray: currentReactions.pray, amen: max(0, currentReactions.amen - 1))
+                    }
+                }
+
+                userReaction = type
+                // Increment new reaction count
+                switch type {
+                case .like: currentReactions = Reactions(like: currentReactions.like + 1, pray: currentReactions.pray, amen: currentReactions.amen)
+                case .pray: currentReactions = Reactions(like: currentReactions.like, pray: currentReactions.pray + 1, amen: currentReactions.amen)
+                case .amen: currentReactions = Reactions(like: currentReactions.like, pray: currentReactions.pray, amen: currentReactions.amen + 1)
+                }
+            }
+        }
 
         // Haptic feedback
         let generator = UIImpactFeedbackGenerator(style: .light)
         generator.impactOccurred()
+
+        Task {
+            do {
+                let response = try await BulletinAPI.shared.toggleReaction(postId: post.id, reactionType: type)
+
+                await MainActor.run {
+                    // Update with server response
+                    currentReactions = Reactions(
+                        like: response.reactions.like,
+                        pray: response.reactions.pray,
+                        amen: response.reactions.amen
+                    )
+                    isTogglingReaction = false
+                }
+            } catch {
+                await MainActor.run {
+                    // Revert optimistic update on error
+                    userReaction = previousReaction
+                    currentReactions = previousReactions
+                    isTogglingReaction = false
+
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
+            }
+        }
     }
 }
 
 struct BulletinPostContent: View {
     let post: BulletinPost
     @Binding var userReaction: ReactionType?
+    @Binding var currentReactions: Reactions
+    @Binding var isTogglingReaction: Bool
+    let onReactionToggle: (ReactionType) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -113,9 +247,17 @@ struct BulletinPostContent: View {
 
                 Spacer()
 
-                Button(action: {}) {
+                Menu {
+                    Button(action: {}) {
+                        Label("Report Post", systemImage: "flag")
+                    }
+                    Button(action: {}) {
+                        Label("Copy Link", systemImage: "link")
+                    }
+                } label: {
                     Image(systemName: "ellipsis")
                         .foregroundColor(.secondary)
+                        .padding(8)
                 }
             }
 
@@ -143,23 +285,29 @@ struct BulletinPostContent: View {
 
             // Reactions Bar
             HStack(spacing: 24) {
-                DetailReactionButton(type: .like, count: post.reactions.like, isSelected: userReaction == .like) {
-                    withAnimation(ChurchTalkAnimations.bouncy) {
-                        userReaction = userReaction == .like ? nil : .like
-                    }
-                }
+                DetailReactionButton(
+                    type: .like,
+                    count: currentReactions.like,
+                    isSelected: userReaction == .like,
+                    isLoading: isTogglingReaction && userReaction == .like,
+                    action: { onReactionToggle(.like) }
+                )
 
-                DetailReactionButton(type: .pray, count: post.reactions.pray, isSelected: userReaction == .pray) {
-                    withAnimation(ChurchTalkAnimations.bouncy) {
-                        userReaction = userReaction == .pray ? nil : .pray
-                    }
-                }
+                DetailReactionButton(
+                    type: .pray,
+                    count: currentReactions.pray,
+                    isSelected: userReaction == .pray,
+                    isLoading: isTogglingReaction && userReaction == .pray,
+                    action: { onReactionToggle(.pray) }
+                )
 
-                DetailReactionButton(type: .amen, count: post.reactions.amen, isSelected: userReaction == .amen) {
-                    withAnimation(ChurchTalkAnimations.bouncy) {
-                        userReaction = userReaction == .amen ? nil : .amen
-                    }
-                }
+                DetailReactionButton(
+                    type: .amen,
+                    count: currentReactions.amen,
+                    isSelected: userReaction == .amen,
+                    isLoading: isTogglingReaction && userReaction == .amen,
+                    action: { onReactionToggle(.amen) }
+                )
 
                 Spacer()
             }
@@ -201,15 +349,36 @@ struct MediaGallery: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 12) {
-                ForEach(urls, id: \.self) { url in
-                    RoundedRectangle(cornerRadius: ChurchTalkTheme.smallCornerRadius)
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(width: 150, height: 150)
-                        .overlay(
-                            Image(systemName: "photo")
-                                .font(.largeTitle)
-                                .foregroundColor(.gray)
-                        )
+                ForEach(urls, id: \.self) { urlString in
+                    AsyncImage(url: URL(string: urlString)) { phase in
+                        switch phase {
+                        case .empty:
+                            RoundedRectangle(cornerRadius: ChurchTalkTheme.smallCornerRadius)
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(width: 150, height: 150)
+                                .overlay(ProgressView())
+
+                        case .success(let image):
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 150, height: 150)
+                                .clipShape(RoundedRectangle(cornerRadius: ChurchTalkTheme.smallCornerRadius))
+
+                        case .failure:
+                            RoundedRectangle(cornerRadius: ChurchTalkTheme.smallCornerRadius)
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(width: 150, height: 150)
+                                .overlay(
+                                    Image(systemName: "photo")
+                                        .font(.largeTitle)
+                                        .foregroundColor(.gray)
+                                )
+
+                        @unknown default:
+                            EmptyView()
+                        }
+                    }
                 }
             }
         }
@@ -220,6 +389,7 @@ struct DetailReactionButton: View {
     let type: ReactionType
     let count: Int
     let isSelected: Bool
+    var isLoading: Bool = false
     let action: () -> Void
 
     var icon: String {
@@ -249,29 +419,56 @@ struct DetailReactionButton: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.title3)
-                    .foregroundColor(isSelected ? color : .secondary)
-                    .scaleEffect(isSelected ? 1.1 : 1.0)
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.7)
+                        .frame(height: 24)
+                } else {
+                    Image(systemName: icon)
+                        .font(.title3)
+                        .foregroundColor(isSelected ? color : .secondary)
+                        .scaleEffect(isSelected ? 1.1 : 1.0)
+                }
 
-                Text("\(count + (isSelected ? 1 : 0))")
+                Text("\(count)")
                     .font(.caption)
                     .foregroundColor(isSelected ? color : .secondary)
             }
             .frame(minWidth: 50)
         }
+        .disabled(isLoading)
     }
 }
 
 struct CommentsSection: View {
     let comments: [Comment]
+    let isLoading: Bool
+    let errorMessage: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             Text("Comments (\(comments.count))")
                 .font(.headline)
 
-            if comments.isEmpty {
+            if isLoading {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .padding()
+                    Spacer()
+                }
+            } else if let error = errorMessage {
+                VStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.largeTitle)
+                        .foregroundColor(.orange)
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 20)
+            } else if comments.isEmpty {
                 Text("No comments yet. Be the first to comment!")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
@@ -328,6 +525,7 @@ struct CommentCard: View {
 struct CommentInputBar: View {
     @Binding var text: String
     @FocusState.Binding var isFocused: Bool
+    var isSubmitting: Bool = false
     let onSubmit: () -> Void
 
     var body: some View {
@@ -339,13 +537,19 @@ struct CommentInputBar: View {
                 .cornerRadius(20)
                 .focused($isFocused)
                 .lineLimit(1...4)
+                .disabled(isSubmitting)
 
             Button(action: onSubmit) {
-                Image(systemName: "arrow.up.circle.fill")
-                    .font(.title)
-                    .foregroundColor(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .gray : .churchTalkRed)
+                if isSubmitting {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                } else {
+                    Image(systemName: "arrow.up.circle.fill")
+                        .font(.title)
+                        .foregroundColor(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .gray : .churchTalkRed)
+                }
             }
-            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
@@ -362,16 +566,19 @@ struct CommentInputBar: View {
 
 #Preview {
     NavigationStack {
-        BulletinDetailView(post: BulletinPost(
-            id: "1",
-            title: "Sunday Service Highlights",
-            content: "What an incredible Sunday! Pastor John shared a powerful message from John 3:16 about God's unconditional love. The worship team led us in beautiful praise and we saw three people give their lives to Christ!\n\nJoin us next Sunday as we continue our series on faith and grace.",
-            author: Member(id: "1", firstName: "Pastor", lastName: "John", email: "pastor@church.org", churchId: "1"),
-            mediaUrls: [],
-            youtubeUrl: "https://youtube.com/watch?v=example",
-            publishedAt: Date().addingTimeInterval(-7200),
-            reactions: Reactions(like: 42, pray: 18, amen: 25),
-            commentCount: 12
-        ))
+        BulletinDetailView(
+            post: BulletinPost(
+                id: "1",
+                title: "Sunday Service Highlights",
+                content: "What an incredible Sunday! Pastor John shared a powerful message from John 3:16 about God's unconditional love. The worship team led us in beautiful praise and we saw three people give their lives to Christ!\n\nJoin us next Sunday as we continue our series on faith and grace.",
+                author: Member(id: "1", firstName: "Pastor", lastName: "John", email: "pastor@church.org", churchId: "1"),
+                mediaUrls: [],
+                youtubeUrl: "https://youtube.com/watch?v=example",
+                publishedAt: Date().addingTimeInterval(-7200),
+                reactions: Reactions(like: 42, pray: 18, amen: 25),
+                commentCount: 12
+            ),
+            source: .feed
+        )
     }
 }
