@@ -134,6 +134,9 @@ class APIClient {
             request.setValue("true", forHTTPHeaderField: "X-Dev-Mode")
         }
 
+        // Add church ID header (hardcoded for development - Norwalk Baptist Church)
+        request.setValue("000000000000000000000003", forHTTPHeaderField: "X-Church-Id")
+
         // Add auth token if available (for non-demo mode)
         if let token = authToken, !isDemoMode {
             request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")

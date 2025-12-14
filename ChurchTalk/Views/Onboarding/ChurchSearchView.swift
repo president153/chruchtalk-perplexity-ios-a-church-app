@@ -6,12 +6,9 @@ struct ChurchSearchView: View {
     @State private var searchText = ""
     @State private var selectedChurch: Church? = nil
 
-    // Demo churches
+    // Churches (single church for now - will fetch from API later)
     let churches: [Church] = [
-        Church(id: "1", name: "First Baptist Church", city: "Lancaster", state: "CA", memberCount: 500),
-        Church(id: "2", name: "Grace Community Church", city: "Palmdale", state: "CA", memberCount: 350),
-        Church(id: "3", name: "New Life Fellowship", city: "Lancaster", state: "CA", memberCount: 200),
-        Church(id: "4", name: "Valley Church", city: "Bakersfield", state: "CA", memberCount: 800),
+        Church(id: "000000000000000000000003", name: "Norwalk Baptist Church", city: "Norwalk", state: "CA", memberCount: 150),
     ]
 
     var filteredChurches: [Church] {

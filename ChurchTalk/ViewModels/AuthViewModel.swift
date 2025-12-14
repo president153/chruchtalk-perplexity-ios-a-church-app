@@ -9,8 +9,8 @@ extension Notification.Name {
 @MainActor
 class AuthViewModel: ObservableObject {
     // MARK: - Auth State
-    @Published var isAuthenticated = false
-    @Published var isEmailVerified = false
+    @Published var isAuthenticated = true  // Auto-auth for development
+    @Published var isEmailVerified = true
     @Published var isPendingApproval = false
 
     // MARK: - User Data
@@ -24,6 +24,37 @@ class AuthViewModel: ObservableObject {
     @Published var showError = false
     @Published var errorMessage: String?
     @Published var error: String?
+
+    // MARK: - Init
+
+    init() {
+        // Auto-login as bernard@aboundfi.com for development
+        // Remove this init() block when wiring real auth
+        user = User(
+            id: "user-bernard-001",
+            email: "bernard@aboundfi.com",
+            name: "Pastor Bernard",
+            isEmailVerified: true
+        )
+
+        currentChurch = Church(
+            id: "000000000000000000000003",
+            name: "Norwalk Baptist Church",
+            city: "Norwalk",
+            state: "CA",
+            memberCount: 150
+        )
+
+        currentMember = Member(
+            id: "member-bernard-001",
+            firstName: "Bernard",
+            lastName: "Moses",
+            email: "bernard@aboundfi.com",
+            phone: nil,
+            churchId: "000000000000000000000003",
+            role: .admin
+        )
+    }
 
     // MARK: - Login
 
