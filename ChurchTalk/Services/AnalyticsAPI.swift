@@ -96,11 +96,7 @@ class AnalyticsAPI {
             completed: completed
         )
 
-        let _: EmptyResponse = try await APIClient.shared.request(
-            endpoint: "/analytics/track/view",
-            method: .post,
-            body: request
-        )
+        try await APIClient.shared.postVoid("/analytics/track/view", body: request)
     }
 
     /// Track when a post scrolls into view (impression)
@@ -111,11 +107,7 @@ class AnalyticsAPI {
             deviceType: DeviceType.ios.rawValue
         )
 
-        let _: EmptyResponse = try await APIClient.shared.request(
-            endpoint: "/analytics/track/impression",
-            method: .post,
-            body: request
-        )
+        try await APIClient.shared.postVoid("/analytics/track/impression", body: request)
     }
 
     /// Track when a user shares a post
@@ -128,18 +120,10 @@ class AnalyticsAPI {
             platform: platform
         )
 
-        let _: EmptyResponse = try await APIClient.shared.request(
-            endpoint: "/analytics/track/share",
-            method: .post,
-            body: request
-        )
+        try await APIClient.shared.postVoid("/analytics/track/share", body: request)
     }
 }
 
-// MARK: - Empty Response
-
-/// Used for endpoints that don't return data
-private struct EmptyResponse: Codable {}
 
 // MARK: - Post View Tracker
 

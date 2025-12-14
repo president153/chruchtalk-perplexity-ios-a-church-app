@@ -87,7 +87,7 @@ class NotificationService: NSObject, ObservableObject {
 
         // Get app and OS version info
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
-        let osVersion = UIDevice.current.systemVersion
+        let osVersion = await MainActor.run { UIDevice.current.systemVersion }
 
         let request = DeviceRegisterRequest(
             deviceToken: tokenString,
@@ -124,7 +124,7 @@ class NotificationService: NSObject, ObservableObject {
         guard let token = deviceToken else { return }
 
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
-        let osVersion = UIDevice.current.systemVersion
+        let osVersion = await MainActor.run { UIDevice.current.systemVersion }
 
         let request = DeviceRegisterRequest(
             deviceToken: token,

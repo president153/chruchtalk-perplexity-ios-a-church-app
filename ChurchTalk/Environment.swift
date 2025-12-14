@@ -22,7 +22,7 @@ enum AppEnvironment: String {
         case .staging:
             return "https://api-staging.churchtalk.ai/api/v1"
         case .production:
-            return "https://api.churchtalk.ai/api/v1"
+            return "https://3fwrgpkxp3.us-east-1.awsapprunner.com/api/v1"
         }
     }
 
