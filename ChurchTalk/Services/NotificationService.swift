@@ -15,9 +15,17 @@ struct DeviceRegisterRequest: Encodable {
     let platform: String
     let appVersion: String?
     let osVersion: String?
+
+    enum CodingKeys: String, CodingKey {
+        case deviceToken = "device_token"
+        case platform
+        case appVersion = "app_version"
+        case osVersion = "os_version"
+    }
 }
 
 /// Response model for device registration
+/// Note: APIClient uses .convertFromSnakeCase so property names match JSON automatically
 struct DeviceResponse: Decodable {
     let id: String
     let userId: String
@@ -25,6 +33,16 @@ struct DeviceResponse: Decodable {
     let deviceToken: String
     let platform: String
     let isActive: Bool
+
+    // Only _id needs explicit mapping since it starts with underscore
+    enum CodingKeys: String, CodingKey {
+        case id = "_id"
+        case userId
+        case churchId
+        case deviceToken
+        case platform
+        case isActive
+    }
 }
 
 /// Service for managing push notifications and device token registration.
