@@ -95,7 +95,8 @@ struct BulletinPostResponse: Codable {
 
     /// Convert API response to BulletinPost model
     func toBulletinPost() -> BulletinPost {
-        let published = parseISO8601Date(publishedAt) ?? Date()
+        // Use createdAt for display since publishedAt can be updated frequently by backend
+        let published = parseISO8601Date(createdAt) ?? parseISO8601Date(publishedAt) ?? Date()
 
         // Create a placeholder author member
         let authorMember = Member(
