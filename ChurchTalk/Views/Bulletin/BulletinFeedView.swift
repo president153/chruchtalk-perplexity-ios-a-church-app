@@ -330,13 +330,19 @@ extension Date {
     func timeAgoDisplay() -> String {
         let calendar = Calendar.current
         let now = Date()
-        let components = calendar.dateComponents([.hour, .day], from: self, to: now)
+        let components = calendar.dateComponents([.minute, .hour, .day, .weekOfYear], from: self, to: now)
 
+        if let weeks = components.weekOfYear, weeks > 0 {
+            return "\(weeks)w ago"
+        }
         if let days = components.day, days > 0 {
             return "\(days)d ago"
         }
         if let hours = components.hour, hours > 0 {
             return "\(hours)h ago"
+        }
+        if let minutes = components.minute, minutes > 0 {
+            return "\(minutes)m ago"
         }
         return "Just now"
     }
