@@ -232,7 +232,7 @@ struct ServiceTime: Codable, Identifiable {
 
 // MARK: - Member
 
-struct Member: Identifiable, Codable {
+struct Member: Identifiable, Codable, Hashable {
     let id: String
     let firstName: String
     let lastName: String
@@ -284,7 +284,7 @@ enum MemberRole: String, Codable {
 
 // MARK: - Address
 
-struct Address: Codable {
+struct Address: Codable, Hashable {
     var street: String
     var city: String
     var state: String
@@ -348,7 +348,7 @@ enum SpiritualStage: Int, Codable, CaseIterable {
     }
 }
 
-struct SpiritualJourney: Codable {
+struct SpiritualJourney: Codable, Hashable {
     var currentStage: SpiritualStage
     var salvationDate: Date?
     var baptismDate: Date?
@@ -405,7 +405,7 @@ struct FamilyMember: Identifiable {
 
 // MARK: - Bulletin Post
 
-struct BulletinPost: Identifiable, Codable {
+struct BulletinPost: Identifiable, Codable, Hashable {
     let id: String
     let title: String
     let content: String
@@ -417,7 +417,7 @@ struct BulletinPost: Identifiable, Codable {
     var commentCount: Int
 }
 
-struct Reactions: Codable {
+struct Reactions: Codable, Hashable {
     var like: Int
     var pray: Int
     var amen: Int

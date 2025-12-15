@@ -5,6 +5,7 @@ struct BulletinFeedView: View {
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var impressionTracker = ImpressionTracker()
+    @State private var selectedPost: BulletinPost?
 
     var body: some View {
         NavigationStack {
@@ -47,14 +48,13 @@ struct BulletinFeedView: View {
                     ScrollView {
                         LazyVStack(spacing: 16) {
                             ForEach(posts) { post in
-                                NavigationLink(destination: BulletinDetailView(post: post, source: .feed)) {
-                                    BulletinPostCard(post: post)
-                                        .onAppear {
-                                            // Track impression when post scrolls into view
-                                            impressionTracker.trackIfNeeded(postId: post.id)
-                                        }
+                                BulletinPostCard(post: post, onNavigate: {
+                                    selectedPost = post
+                                })
+                                .onAppear {
+                                    // Track impression when post scrolls into view
+                                    impressionTracker.trackIfNeeded(postId: post.id)
                                 }
-                                .buttonStyle(PlainButtonStyle())
                             }
                         }
                         .padding()
@@ -63,6 +63,9 @@ struct BulletinFeedView: View {
                         // Reset impressions on refresh
                         impressionTracker.reset()
                         await fetchPosts()
+                    }
+                    .navigationDestination(item: $selectedPost) { post in
+                        BulletinDetailView(post: post, source: .feed)
                     }
                 }
             }
@@ -102,71 +105,80 @@ struct BulletinFeedView: View {
 
 struct BulletinPostCard: View {
     let post: BulletinPost
+    var onNavigate: (() -> Void)? = nil  // Optional navigation callback
     @State private var userReaction: ReactionType? = nil
     @State private var currentReactions: Reactions
 
-    init(post: BulletinPost) {
+    init(post: BulletinPost, onNavigate: (() -> Void)? = nil) {
         self.post = post
+        self.onNavigate = onNavigate
         self._currentReactions = State(initialValue: post.reactions)
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Author Header
-            HStack(spacing: 12) {
-                Circle()
-                    .fill(Color.churchTalkRed.opacity(0.2))
-                    .frame(width: 44, height: 44)
-                    .overlay(
-                        Text(post.author.initials)
-                            .font(.headline)
-                            .foregroundColor(.churchTalkRed)
-                    )
+            // Tappable content area (for navigation)
+            VStack(alignment: .leading, spacing: 12) {
+                // Author Header
+                HStack(spacing: 12) {
+                    Circle()
+                        .fill(Color.churchTalkRed.opacity(0.2))
+                        .frame(width: 44, height: 44)
+                        .overlay(
+                            Text(post.author.initials)
+                                .font(.headline)
+                                .foregroundColor(.churchTalkRed)
+                        )
 
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(post.author.fullName)
-                        .font(.headline)
-                    Text(post.publishedAt.timeAgoDisplay())
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(post.author.fullName)
+                            .font(.headline)
+                        Text(post.publishedAt.timeAgoDisplay())
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Spacer()
+
+                    Button(action: {}) {
+                        Image(systemName: "ellipsis")
+                            .foregroundColor(.secondary)
+                    }
                 }
 
-                Spacer()
+                // Content
+                Text(post.title)
+                    .font(.title3)
+                    .fontWeight(.semibold)
 
-                Button(action: {}) {
-                    Image(systemName: "ellipsis")
-                        .foregroundColor(.secondary)
+                Text(post.content.strippingHTML())
+                    .font(.body)
+                    .foregroundColor(.secondary)
+                    .lineLimit(3)
+
+                // YouTube indicator
+                if post.youtubeUrl != nil {
+                    HStack {
+                        Image(systemName: "play.rectangle.fill")
+                            .foregroundColor(.red)
+                        Text("Watch Video")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.vertical, 8)
+                    .padding(.horizontal, 12)
+                    .background(Color.gray.opacity(0.1))
+                    .cornerRadius(8)
                 }
             }
-
-            // Content
-            Text(post.title)
-                .font(.title3)
-                .fontWeight(.semibold)
-
-            Text(post.content)
-                .font(.body)
-                .foregroundColor(.secondary)
-                .lineLimit(3)
-
-            // YouTube indicator
-            if post.youtubeUrl != nil {
-                HStack {
-                    Image(systemName: "play.rectangle.fill")
-                        .foregroundColor(.red)
-                    Text("Watch Video")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                .padding(.vertical, 8)
-                .padding(.horizontal, 12)
-                .background(Color.gray.opacity(0.1))
-                .cornerRadius(8)
+            .contentShape(Rectangle())
+            .onTapGesture {
+                onNavigate?()
             }
 
             Divider()
 
-            // Reactions Bar
+            // Reactions Bar - NOT in tap area for navigation
             HStack(spacing: 24) {
                 ReactionButton(
                     type: .like,
@@ -309,6 +321,25 @@ extension Date {
             return "\(hours)h ago"
         }
         return "Just now"
+    }
+}
+
+extension String {
+    /// Strips HTML tags from the string
+    func strippingHTML() -> String {
+        guard let data = self.data(using: .utf8) else { return self }
+
+        let options: [NSAttributedString.DocumentReadingOptionKey: Any] = [
+            .documentType: NSAttributedString.DocumentType.html,
+            .characterEncoding: String.Encoding.utf8.rawValue
+        ]
+
+        if let attributedString = try? NSAttributedString(data: data, options: options, documentAttributes: nil) {
+            return attributedString.string
+        }
+
+        // Fallback: simple regex stripping
+        return self.replacingOccurrences(of: "<[^>]+>", with: "", options: .regularExpression)
     }
 }
 
