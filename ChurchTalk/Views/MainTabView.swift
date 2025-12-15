@@ -9,25 +9,22 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            // Content
-            Group {
-                switch selectedTab {
-                case 0:
-                    HomeView()
-                case 1:
-                    ConnectTabView()
-                case 2:
-                    ServeTabView()
-                case 3:
-                    ProfileTabView(isAdmin: isAdmin)
-                default:
-                    HomeView()
-                }
+        Group {
+            switch selectedTab {
+            case 0:
+                HomeView()
+            case 1:
+                ConnectTabView()
+            case 2:
+                ServeTabView()
+            case 3:
+                ProfileTabView(isAdmin: isAdmin)
+            default:
+                HomeView()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            // Floating Tab Bar
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .safeAreaInset(edge: .bottom) {
             FloatingTabBar(selectedTab: $selectedTab)
         }
         .ignoresSafeArea(.keyboard)

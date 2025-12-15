@@ -19,71 +19,60 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                LazyVStack(spacing: 24, pinnedViews: [.sectionHeaders]) {
-                    // Main content section with sticky header
-                    Section {
-                        // Quick Actions
-                        QuickActionsRow()
+                LazyVStack(spacing: 24) {
+                    // Quick Actions
+                    QuickActionsRow()
 
-                        // Featured/Live Content (if available)
-                        FeaturedContentCard()
+                    // Featured/Live Content (if available)
+                    FeaturedContentCard()
 
-                        // Upcoming Events Carousel
-                        if !events.isEmpty {
-                            UpcomingEventsCarousel(
-                                events: events,
-                                onSeeAll: { showEventsSheet = true }
-                            )
-                        }
-
-                        // Announcements Section
-                        VStack(alignment: .leading, spacing: 12) {
-                            Text("ANNOUNCEMENTS")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.secondary)
-                                .tracking(1)
-                                .padding(.horizontal)
-
-                            if isLoading {
-                                ProgressView()
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                            } else if posts.isEmpty {
-                                Text("No announcements yet")
-                                    .foregroundColor(.secondary)
-                                    .frame(maxWidth: .infinity)
-                                    .padding()
-                            } else {
-                                ForEach(posts) { post in
-                                    BulletinPostCard(post: post, onNavigate: {
-                                        selectedPost = post
-                                    })
-                                }
-                                .padding(.horizontal)
-                            }
-                        }
-
-                        // Bottom padding for floating tab bar
-                        Spacer()
-                            .frame(height: 100)
-                    } header: {
-                        // Sticky Church Header with solid background
-                        VStack(spacing: 0) {
-                            HomeHeaderView(
-                                churchName: churchName,
-                                churchLogoUrl: churchLogoUrl
-                            )
-                            .padding(.bottom, 8)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .background(Color(.systemBackground))
-                        .background(
-                            Color(.systemBackground)
-                                .ignoresSafeArea(edges: .top)
+                    // Upcoming Events Carousel
+                    if !events.isEmpty {
+                        UpcomingEventsCarousel(
+                            events: events,
+                            onSeeAll: { showEventsSheet = true }
                         )
                     }
+
+                    // Announcements Section
+                    VStack(alignment: .leading, spacing: 12) {
+                        Text("ANNOUNCEMENTS")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.secondary)
+                            .tracking(1)
+                            .padding(.horizontal)
+
+                        if isLoading {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                        } else if posts.isEmpty {
+                            Text("No announcements yet")
+                                .foregroundColor(.secondary)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                        } else {
+                            ForEach(posts) { post in
+                                BulletinPostCard(post: post, onNavigate: {
+                                    selectedPost = post
+                                })
+                            }
+                            .padding(.horizontal)
+                        }
+                    }
                 }
+            }
+            .safeAreaInset(edge: .top) {
+                VStack(spacing: 0) {
+                    HomeHeaderView(
+                        churchName: churchName,
+                        churchLogoUrl: churchLogoUrl
+                    )
+                    .padding(.bottom, 8)
+                }
+                .frame(maxWidth: .infinity)
+                .background(Color(.systemBackground))
             }
             .refreshable {
                 await refreshContent()
