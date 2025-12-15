@@ -113,6 +113,7 @@ struct BulletinPostCard: View {
         self.post = post
         self.onNavigate = onNavigate
         self._currentReactions = State(initialValue: post.reactions)
+        self._userReaction = State(initialValue: post.userReaction)
     }
 
     var body: some View {
@@ -296,15 +297,23 @@ struct ReactionButton: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            // Haptic feedback
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
+            action()
+        }) {
             HStack(spacing: 4) {
                 Image(systemName: icon)
                     .foregroundColor(isSelected ? color : .secondary)
+                    .scaleEffect(isSelected ? 1.2 : 1.0)
+                    .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isSelected)
                 Text("\(count)")
                     .foregroundColor(isSelected ? color : .secondary)
             }
             .font(.subheadline)
         }
+        .animation(.easeInOut(duration: 0.2), value: isSelected)
     }
 }
 

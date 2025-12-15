@@ -415,6 +415,7 @@ struct BulletinPost: Identifiable, Codable, Hashable {
     let publishedAt: Date
     var reactions: Reactions
     var commentCount: Int
+    var userReaction: ReactionType?
 }
 
 struct Reactions: Codable, Hashable {
@@ -435,12 +436,14 @@ enum ReactionType: String, Codable {
 
 // MARK: - Comment
 
-struct Comment: Identifiable, Codable {
+struct Comment: Identifiable, Codable, Hashable {
     let id: String
     let content: String
     let author: Member
     let createdAt: Date
     var postId: String?
+    var parentId: String?
+    var replies: [Comment] = []
 }
 
 // MARK: - Outreach

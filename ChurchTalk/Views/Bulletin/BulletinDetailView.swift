@@ -15,6 +15,9 @@ struct BulletinDetailView: View {
     @State private var isTogglingReaction = false
     @State private var errorMessage: String?
 
+    // Reply state
+    @State private var replyingTo: Comment? = nil
+
     // View tracking
     @State private var viewTracker: PostViewTracker?
     @State private var viewStartTime: Date?
@@ -23,6 +26,7 @@ struct BulletinDetailView: View {
         self.post = post
         self.viewSource = source
         _currentReactions = State(initialValue: post.reactions)
+        _userReaction = State(initialValue: post.userReaction)
     }
 
     var body: some View {
@@ -45,7 +49,11 @@ struct BulletinDetailView: View {
                     CommentsSection(
                         comments: comments,
                         isLoading: isLoadingComments,
-                        errorMessage: errorMessage
+                        errorMessage: errorMessage,
+                        onReply: { comment in
+                            replyingTo = comment
+                            isCommentFieldFocused = true
+                        }
                     )
                 }
                 .padding()
@@ -59,6 +67,8 @@ struct BulletinDetailView: View {
                 text: $newCommentText,
                 isFocused: $isCommentFieldFocused,
                 isSubmitting: isSubmittingComment,
+                replyingTo: replyingTo,
+                onCancelReply: { replyingTo = nil },
                 onSubmit: submitComment
             )
         }
@@ -114,19 +124,29 @@ struct BulletinDetailView: View {
 
         isSubmittingComment = true
         let commentContent = newCommentText
+        let parentComment = replyingTo
         newCommentText = ""
+        replyingTo = nil
         isCommentFieldFocused = false
 
         Task {
             do {
                 let newComment = try await BulletinAPI.shared.createComment(
                     postId: post.id,
-                    content: commentContent
+                    content: commentContent,
+                    parentId: parentComment?.id
                 )
 
                 await MainActor.run {
                     withAnimation(ChurchTalkAnimations.smooth) {
-                        comments.insert(newComment, at: 0)
+                        if let parentId = parentComment?.id,
+                           let parentIndex = comments.firstIndex(where: { $0.id == parentId }) {
+                            // Add as reply to parent comment
+                            comments[parentIndex].replies.append(newComment)
+                        } else {
+                            // Add as top-level comment
+                            comments.insert(newComment, at: 0)
+                        }
                     }
                     isSubmittingComment = false
 
@@ -137,6 +157,7 @@ struct BulletinDetailView: View {
             } catch {
                 await MainActor.run {
                     newCommentText = commentContent // Restore text on failure
+                    replyingTo = parentComment // Restore reply state
                     isSubmittingComment = false
 
                     // Error haptic
@@ -267,7 +288,7 @@ struct BulletinPostContent: View {
                 .fontWeight(.bold)
 
             // Full Content
-            Text(post.content)
+            Text(post.content.strippingHTML())
                 .font(.body)
                 .lineSpacing(4)
 
@@ -444,6 +465,7 @@ struct CommentsSection: View {
     let comments: [Comment]
     let isLoading: Bool
     let errorMessage: String?
+    var onReply: ((Comment) -> Void)? = nil
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -475,7 +497,7 @@ struct CommentsSection: View {
                     .padding(.vertical, 20)
             } else {
                 ForEach(comments) { comment in
-                    CommentCard(comment: comment)
+                    CommentCard(comment: comment, onReply: onReply)
                         .transition(ChurchTalkAnimations.slideUp)
                 }
             }
@@ -485,40 +507,65 @@ struct CommentsSection: View {
 
 struct CommentCard: View {
     let comment: Comment
+    var onReply: ((Comment) -> Void)? = nil
+    var isReply: Bool = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Circle()
-                .fill(Color.churchTalkRed.opacity(0.15))
-                .frame(width: ChurchTalkTheme.avatarSmall, height: ChurchTalkTheme.avatarSmall)
-                .overlay(
-                    Text(comment.author.initials)
-                        .font(.caption)
-                        .fontWeight(.medium)
-                        .foregroundColor(.churchTalkRed)
-                )
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 12) {
+                Circle()
+                    .fill(Color.churchTalkRed.opacity(0.15))
+                    .frame(width: isReply ? 28 : ChurchTalkTheme.avatarSmall, height: isReply ? 28 : ChurchTalkTheme.avatarSmall)
+                    .overlay(
+                        Text(comment.author.initials)
+                            .font(isReply ? .caption2 : .caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(.churchTalkRed)
+                    )
 
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(comment.author.fullName)
-                        .font(.subheadline)
-                        .fontWeight(.medium)
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(comment.author.fullName)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
 
-                    Text(comment.createdAt.timeAgoDisplay())
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                        Text(comment.createdAt.timeAgoDisplay())
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    Text(comment.content)
+                        .font(.body)
+                        .fixedSize(horizontal: false, vertical: true)
+
+                    // Reply button (only for top-level comments)
+                    if !isReply, let onReply = onReply {
+                        Button(action: { onReply(comment) }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "arrowshape.turn.up.left")
+                                Text("Reply")
+                            }
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        }
+                        .padding(.top, 4)
+                    }
                 }
 
-                Text(comment.content)
-                    .font(.body)
-                    .fixedSize(horizontal: false, vertical: true)
+                Spacer()
             }
+            .padding()
+            .background(Color(.systemGray6))
+            .cornerRadius(ChurchTalkTheme.cornerRadius)
 
-            Spacer()
+            // Show nested replies
+            if !comment.replies.isEmpty {
+                ForEach(comment.replies) { reply in
+                    CommentCard(comment: reply, isReply: true)
+                        .padding(.leading, 32)
+                }
+            }
         }
-        .padding()
-        .background(Color(.systemGray6))
-        .cornerRadius(ChurchTalkTheme.cornerRadius)
     }
 }
 
@@ -526,34 +573,59 @@ struct CommentInputBar: View {
     @Binding var text: String
     @FocusState.Binding var isFocused: Bool
     var isSubmitting: Bool = false
+    var replyingTo: Comment? = nil
+    var onCancelReply: (() -> Void)? = nil
     let onSubmit: () -> Void
 
     var body: some View {
-        HStack(spacing: 12) {
-            TextField("Add a comment...", text: $text, axis: .vertical)
-                .textFieldStyle(.plain)
-                .padding(12)
-                .background(Color(.systemGray6))
-                .cornerRadius(20)
-                .focused($isFocused)
-                .lineLimit(1...4)
-                .disabled(isSubmitting)
+        VStack(spacing: 0) {
+            // Reply indicator
+            if let comment = replyingTo {
+                HStack {
+                    Text("Replying to ")
+                        .foregroundColor(.secondary)
+                    + Text("@\(comment.author.fullName)")
+                        .foregroundColor(.churchTalkRed)
+                        .fontWeight(.medium)
 
-            Button(action: onSubmit) {
-                if isSubmitting {
-                    ProgressView()
-                        .scaleEffect(0.8)
-                } else {
-                    Image(systemName: "arrow.up.circle.fill")
-                        .font(.title)
-                        .foregroundColor(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .gray : .churchTalkRed)
+                    Spacer()
+
+                    Button(action: { onCancelReply?() }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                    }
                 }
+                .font(.caption)
+                .padding(.horizontal)
+                .padding(.vertical, 8)
+                .background(Color(.systemGray6))
             }
-            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
+
+            HStack(spacing: 12) {
+                TextField(replyingTo != nil ? "Write a reply..." : "Add a comment...", text: $text, axis: .vertical)
+                    .textFieldStyle(.plain)
+                    .padding(12)
+                    .background(Color(.systemGray6))
+                    .cornerRadius(20)
+                    .focused($isFocused)
+                    .lineLimit(1...4)
+                    .disabled(isSubmitting)
+
+                Button(action: onSubmit) {
+                    if isSubmitting {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                    } else {
+                        Image(systemName: "arrow.up.circle.fill")
+                            .font(.title)
+                            .foregroundColor(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .gray : .churchTalkRed)
+                    }
+                }
+                .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSubmitting)
+            }
+            .padding(.horizontal)
+            .padding(.vertical, 8)
         }
-        .padding(.horizontal)
-        .padding(.vertical, 8)
-        .padding(.bottom, 80) // Extra padding for floating tab bar
         .background(Color(.systemBackground))
         .overlay(
             Rectangle()

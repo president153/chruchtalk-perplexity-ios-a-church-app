@@ -7,6 +7,25 @@
 
 import Foundation
 
+// MARK: - Date Parsing Helper
+
+/// Parse ISO8601 date string, trying with and without fractional seconds
+private func parseISO8601Date(_ string: String) -> Date? {
+    // Try with fractional seconds first
+    let formatterWithFractional = ISO8601DateFormatter()
+    formatterWithFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+    if let date = formatterWithFractional.date(from: string) {
+        return date
+    }
+
+    // Try without fractional seconds
+    let formatterWithoutFractional = ISO8601DateFormatter()
+    formatterWithoutFractional.formatOptions = [.withInternetDateTime]
+
+    return formatterWithoutFractional.date(from: string)
+}
+
 // MARK: - Response Types
 
 /// Response for a single bulletin post from API
@@ -40,10 +59,7 @@ struct BulletinPostResponse: Codable {
 
     /// Convert API response to BulletinPost model
     func toBulletinPost() -> BulletinPost {
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        let published = dateFormatter.date(from: publishedAt) ?? Date()
+        let published = parseISO8601Date(publishedAt) ?? Date()
 
         // Create a placeholder author member
         let authorMember = Member(
@@ -53,6 +69,9 @@ struct BulletinPostResponse: Codable {
             email: "",
             churchId: churchId
         )
+
+        // Parse user's reaction from the array
+        let userReaction: ReactionType? = userReactions.first.flatMap { ReactionType(rawValue: $0) }
 
         return BulletinPost(
             id: id,
@@ -67,7 +86,8 @@ struct BulletinPostResponse: Codable {
                 pray: reactions.pray,
                 amen: reactions.amen
             ),
-            commentCount: commentCount
+            commentCount: commentCount,
+            userReaction: userReaction
         )
     }
 }
@@ -97,10 +117,7 @@ struct CommentResponse: Codable {
 
     /// Convert API response to Comment model
     func toComment() -> Comment {
-        let dateFormatter = ISO8601DateFormatter()
-        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-
-        let created = dateFormatter.date(from: createdAt) ?? Date()
+        let created = parseISO8601Date(createdAt) ?? Date()
 
         let authorMember = Member(
             id: authorId,
@@ -115,7 +132,8 @@ struct CommentResponse: Codable {
             content: content,
             author: authorMember,
             createdAt: created,
-            postId: postId
+            postId: postId,
+            parentId: parentId
         )
     }
 }
@@ -136,6 +154,16 @@ struct PostCreateRequest: Codable {
     var mediaUrls: [String] = []
     var youtubeUrl: String?
     var bibleReferences: [String] = []
+}
+
+/// Request body for updating a post
+struct PostUpdateRequest: Codable {
+    var title: String?
+    var content: String?
+    var postType: String?
+    var mediaUrls: [String]?
+    var youtubeUrl: String?
+    var bibleReferences: [String]?
 }
 
 /// Request body for creating a comment
@@ -206,6 +234,22 @@ class BulletinAPI {
     func createPost(_ request: PostCreateRequest) async throws -> BulletinPost {
         let response: BulletinPostResponse = try await client.post("/bulletin", body: request)
         return response.toBulletinPost()
+    }
+
+    /// Update an existing bulletin post
+    /// - Parameters:
+    ///   - postId: The post ID
+    ///   - request: Post update data
+    /// - Returns: Updated BulletinPost
+    func updatePost(id postId: String, _ request: PostUpdateRequest) async throws -> BulletinPost {
+        let response: BulletinPostResponse = try await client.patch("/bulletin/\(postId)", body: request)
+        return response.toBulletinPost()
+    }
+
+    /// Delete a bulletin post
+    /// - Parameter postId: The post ID
+    func deletePost(id postId: String) async throws {
+        try await client.delete("/bulletin/\(postId)")
     }
 
     /// Toggle a reaction on a post
