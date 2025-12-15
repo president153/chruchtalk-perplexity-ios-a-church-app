@@ -25,11 +25,7 @@ struct MainTabView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .safeAreaInset(edge: .bottom) {
-            VStack(spacing: 0) {
-                FloatingTabBar(selectedTab: $selectedTab)
-            }
-            .frame(maxWidth: .infinity)
-            .background(.ultraThinMaterial)
+            FloatingTabBar(selectedTab: $selectedTab)
         }
         .ignoresSafeArea(.keyboard)
     }
