@@ -97,6 +97,29 @@ class APIClient {
                 return date
             }
 
+            // Backend returns dates WITHOUT timezone (e.g., "2025-12-15T16:43:31.381831")
+            let dateFormatter = DateFormatter()
+            dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+            dateFormatter.timeZone = TimeZone(identifier: "UTC")
+
+            // Try with 6 fractional second digits
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+            if let date = dateFormatter.date(from: dateString) {
+                return date
+            }
+
+            // Try with 3 fractional second digits
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
+            if let date = dateFormatter.date(from: dateString) {
+                return date
+            }
+
+            // Try without fractional seconds
+            dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+            if let date = dateFormatter.date(from: dateString) {
+                return date
+            }
+
             throw DecodingError.dataCorruptedError(
                 in: container,
                 debugDescription: "Cannot decode date: \(dateString)"
@@ -153,11 +176,21 @@ class APIClient {
     // MARK: - Request Execution
 
     private func execute<T: Decodable>(_ request: URLRequest) async throws -> T {
+        print("🌐 API Request: \(request.httpMethod ?? "?") \(request.url?.absoluteString ?? "?")")
+        if let body = request.httpBody, let bodyString = String(data: body, encoding: .utf8) {
+            print("🌐 Request Body: \(bodyString)")
+        }
+
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw APIError.requestFailed(statusCode: 0)
+            }
+
+            print("🌐 Response Status: \(httpResponse.statusCode)")
+            if let jsonString = String(data: data, encoding: .utf8) {
+                print("🌐 Response Body: \(jsonString.prefix(500))")
             }
 
             // Handle HTTP status codes
@@ -167,7 +200,7 @@ class APIClient {
                 do {
                     return try decoder.decode(T.self, from: data)
                 } catch {
-                    print("Decoding error: \(error)")
+                    print("❌ Decoding error: \(error)")
                     if let jsonString = String(data: data, encoding: .utf8) {
                         print("Response JSON: \(jsonString)")
                     }
@@ -183,8 +216,10 @@ class APIClient {
                 throw APIError.requestFailed(statusCode: httpResponse.statusCode)
             }
         } catch let error as APIError {
+            print("❌ API Error: \(error)")
             throw error
         } catch {
+            print("❌ Network Error: \(error)")
             throw APIError.networkError(error)
         }
     }

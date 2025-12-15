@@ -222,6 +222,8 @@ struct BulletinPostCard: View {
     }
 
     private func toggleReaction(_ type: ReactionType) async {
+        print("🔵 toggleReaction called with type: \(type)")
+
         // Optimistic update
         let previousReaction = userReaction
         let previousReactions = currentReactions
@@ -257,6 +259,7 @@ struct BulletinPostCard: View {
                 postId: post.id,
                 reactionType: type
             )
+            print("🟢 Reaction toggle success: \(response)")
             await MainActor.run {
                 currentReactions = Reactions(
                     like: response.reactions.like,
@@ -265,6 +268,7 @@ struct BulletinPostCard: View {
                 )
             }
         } catch {
+            print("❌ Reaction toggle failed: \(error)")
             // Revert on error
             await MainActor.run {
                 userReaction = previousReaction
@@ -301,6 +305,7 @@ struct ReactionButton: View {
             // Haptic feedback
             let generator = UIImpactFeedbackGenerator(style: .light)
             generator.impactOccurred()
+            print("🔴 ReactionButton tapped: \(type)")
             action()
         }) {
             HStack(spacing: 4) {
@@ -312,7 +317,11 @@ struct ReactionButton: View {
                     .foregroundColor(isSelected ? color : .secondary)
             }
             .font(.subheadline)
+            .padding(.vertical, 8)
+            .padding(.horizontal, 4)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .animation(.easeInOut(duration: 0.2), value: isSelected)
     }
 }

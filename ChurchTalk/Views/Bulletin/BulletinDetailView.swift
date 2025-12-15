@@ -169,7 +169,11 @@ struct BulletinDetailView: View {
     }
 
     private func toggleReaction(_ type: ReactionType) {
-        guard !isTogglingReaction else { return }
+        print("🔵 DetailView toggleReaction called with type: \(type)")
+        guard !isTogglingReaction else {
+            print("⚠️ toggleReaction blocked - already toggling")
+            return
+        }
 
         isTogglingReaction = true
 
@@ -213,6 +217,7 @@ struct BulletinDetailView: View {
         Task {
             do {
                 let response = try await BulletinAPI.shared.toggleReaction(postId: post.id, reactionType: type)
+                print("🟢 DetailView reaction toggle success: \(response)")
 
                 await MainActor.run {
                     // Update with server response
@@ -224,6 +229,7 @@ struct BulletinDetailView: View {
                     isTogglingReaction = false
                 }
             } catch {
+                print("❌ DetailView reaction toggle failed: \(error)")
                 await MainActor.run {
                     // Revert optimistic update on error
                     userReaction = previousReaction
@@ -438,7 +444,12 @@ struct DetailReactionButton: View {
     }
 
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            let generator = UIImpactFeedbackGenerator(style: .light)
+            generator.impactOccurred()
+            print("🔴 DetailReactionButton tapped: \(type)")
+            action()
+        }) {
             VStack(spacing: 4) {
                 if isLoading {
                     ProgressView()
@@ -456,7 +467,10 @@ struct DetailReactionButton: View {
                     .foregroundColor(isSelected ? color : .secondary)
             }
             .frame(minWidth: 50)
+            .padding(.vertical, 8)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
         .disabled(isLoading)
     }
 }
@@ -468,7 +482,7 @@ struct CommentsSection: View {
     var onReply: ((Comment) -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        LazyVStack(alignment: .leading, spacing: 16) {
             Text("Comments (\(comments.count))")
                 .font(.headline)
 

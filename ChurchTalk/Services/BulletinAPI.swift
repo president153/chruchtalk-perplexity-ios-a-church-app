@@ -9,21 +9,57 @@ import Foundation
 
 // MARK: - Date Parsing Helper
 
-/// Parse ISO8601 date string, trying with and without fractional seconds
+/// Parse ISO8601 date string, handling various formats from the backend
 private func parseISO8601Date(_ string: String) -> Date? {
-    // Try with fractional seconds first
+    print("📅 Parsing date string: '\(string)'")
+
+    // Try with fractional seconds and timezone
     let formatterWithFractional = ISO8601DateFormatter()
     formatterWithFractional.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
     if let date = formatterWithFractional.date(from: string) {
+        print("📅 Parsed with fractional seconds: \(date)")
         return date
     }
 
-    // Try without fractional seconds
+    // Try without fractional seconds but with timezone
     let formatterWithoutFractional = ISO8601DateFormatter()
     formatterWithoutFractional.formatOptions = [.withInternetDateTime]
 
-    return formatterWithoutFractional.date(from: string)
+    if let date = formatterWithoutFractional.date(from: string) {
+        print("📅 Parsed without fractional seconds: \(date)")
+        return date
+    }
+
+    // Backend returns dates WITHOUT timezone (e.g., "2025-12-15T16:43:31.381831")
+    // Try using DateFormatter for this format
+    let dateFormatter = DateFormatter()
+    dateFormatter.locale = Locale(identifier: "en_US_POSIX")
+    dateFormatter.timeZone = TimeZone(identifier: "UTC")
+
+    // Try with fractional seconds but no timezone
+    dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS"
+    if let date = dateFormatter.date(from: string) {
+        print("📅 Parsed with custom format (fractional, no TZ): \(date)")
+        return date
+    }
+
+    // Try with fewer fractional second digits
+    dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss.SSS"
+    if let date = dateFormatter.date(from: string) {
+        print("📅 Parsed with custom format (3 frac digits): \(date)")
+        return date
+    }
+
+    // Try without fractional seconds and no timezone
+    dateFormatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ss"
+    if let date = dateFormatter.date(from: string) {
+        print("📅 Parsed with custom format (no frac, no TZ): \(date)")
+        return date
+    }
+
+    print("❌ Failed to parse date: '\(string)'")
+    return nil
 }
 
 // MARK: - Response Types
