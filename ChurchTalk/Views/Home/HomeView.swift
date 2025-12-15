@@ -72,7 +72,7 @@ struct HomeView: View {
                     .padding(.bottom, 8)
                 }
                 .frame(maxWidth: .infinity)
-                .background(Color(.systemBackground))
+                .background(.ultraThinMaterial)
             }
             .refreshable {
                 await refreshContent()
