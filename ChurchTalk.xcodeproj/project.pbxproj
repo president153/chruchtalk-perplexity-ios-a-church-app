@@ -88,6 +88,8 @@
 		AABBCC18DEADBEEF0000000C /* OutreachAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC19DEADBEEF0000000C /* OutreachAPI.swift */; };
 		AABBCC1ADEADBEEF0000000D /* UploadsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC1BDEADBEEF0000000D /* UploadsAPI.swift */; };
 		AABBCC1CDEADBEEF0000000E /* ChurchAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC1DDEADBEEF0000000E /* ChurchAPI.swift */; };
+		AABBCC1EDEADBEEF0000000F /* KeychainService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC1FDEADBEEF0000000F /* KeychainService.swift */; };
+		AABBCC20DEADBEEF00000010 /* AuthGate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC21DEADBEEF00000010 /* AuthGate.swift */; };
 		ADE07B6B7B639B7B98CAE1C2 /* EventsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 912CCCBDBA01BEDEB10D8061 /* EventsTabView.swift */; };
 		ADF879F2307F2AFAC18119A0 /* ScaleButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60411F4609E29A5B40F58C3F /* ScaleButtonStyle.swift */; };
 		B36173517B7ADE598068CA06 /* PendingApprovalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 602BA20BA0EF38E2E73FB601 /* PendingApprovalView.swift */; };
@@ -196,6 +198,8 @@
 		AABBCC19DEADBEEF0000000C /* OutreachAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OutreachAPI.swift; sourceTree = "<group>"; };
 		AABBCC1BDEADBEEF0000000D /* UploadsAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UploadsAPI.swift; sourceTree = "<group>"; };
 		AABBCC1DDEADBEEF0000000E /* ChurchAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChurchAPI.swift; sourceTree = "<group>"; };
+		AABBCC1FDEADBEEF0000000F /* KeychainService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = KeychainService.swift; sourceTree = "<group>"; };
+		AABBCC21DEADBEEF00000010 /* AuthGate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AuthGate.swift; sourceTree = "<group>"; };
 		AF3F5FB023F4ABCE18DCD8C7 /* EmailVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailVerificationView.swift; sourceTree = "<group>"; };
 		B3874FF954004C319A22D48B /* BibleReferenceChip.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BibleReferenceChip.swift; sourceTree = "<group>"; };
 		B920B40CF057D4230BB1A0EF /* ImagePicker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImagePicker.swift; sourceTree = "<group>"; };
@@ -552,6 +556,7 @@
 				F0E078A9871EB30D8B717087 /* AnalyticsAPI.swift */,
 				790E4A77C36BFFB0E772DCAB /* BulletinAPI.swift */,
 				F4B82F3FE05C7F9613092CD8 /* NotificationService.swift */,
+				AABBCC1FDEADBEEF0000000F /* KeychainService.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -570,6 +575,7 @@
 				A0596F7DC714A274284F1FAA /* LoginView.swift */,
 				AF3F5FB023F4ABCE18DCD8C7 /* EmailVerificationView.swift */,
 				602BA20BA0EF38E2E73FB601 /* PendingApprovalView.swift */,
+				AABBCC21DEADBEEF00000010 /* AuthGate.swift */,
 			);
 			path = Auth;
 			sourceTree = "<group>";
@@ -720,6 +726,8 @@
 				AABBCC18DEADBEEF0000000C /* OutreachAPI.swift in Sources */,
 				AABBCC1ADEADBEEF0000000D /* UploadsAPI.swift in Sources */,
 				AABBCC1CDEADBEEF0000000E /* ChurchAPI.swift in Sources */,
+				AABBCC1EDEADBEEF0000000F /* KeychainService.swift in Sources */,
+				AABBCC20DEADBEEF00000010 /* AuthGate.swift in Sources */,
 				AABBCC0CDEADBEEF00000006 /* NotificationService.swift in Sources */,
 				AABBCC0EDEADBEEF00000007 /* AppDelegate.swift in Sources */,
 				C03E4BC29DE7E3DFB9337A32 /* NotificationSettingsView.swift in Sources */,
@@ -891,7 +899,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = ChurchTalk/ChurchTalk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 34;
+				CURRENT_PROJECT_VERSION = 35;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "A Church App";
@@ -920,7 +928,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = ChurchTalk/ChurchTalk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 34;
+				CURRENT_PROJECT_VERSION = 35;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "A Church App";

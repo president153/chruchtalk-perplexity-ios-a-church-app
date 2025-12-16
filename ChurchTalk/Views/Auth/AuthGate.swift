@@ -46,7 +46,7 @@ struct AuthGate: View {
         } else if !authViewModel.isEmailVerified {
             // Authenticated but email not verified
             NavigationStack {
-                EmailVerificationView(email: authViewModel.user?.email ?? "")
+                EmailVerificationView()
                     .environmentObject(authViewModel)
             }
             .transition(.opacity)
@@ -213,8 +213,7 @@ struct RoleBasedAccessModifier: ViewModifier {
     func body(content: Content) -> some View {
         Group {
             if let member = authViewModel.currentMember,
-               let role = member.role,
-               requiredRoles.contains(role) {
+               requiredRoles.contains(member.role) {
                 content
             } else if let fallback = fallbackView {
                 fallback
