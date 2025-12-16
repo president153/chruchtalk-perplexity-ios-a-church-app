@@ -6,44 +6,34 @@ struct PrayerModerationView: View {
     @State private var showingApproveAlert = false
     @State private var showingRejectAlert = false
     @State private var selectedRequest: PrayerRequest?
-
-    // Demo pending requests
-    let demoPendingRequests: [PrayerRequest] = [
-        PrayerRequest(
-            id: "p1",
-            content: "Please pray for my family during this difficult time. We're going through some challenges.",
-            authorId: "1",
-            authorName: "John D.",
-            isAnonymous: false,
-            prayerCount: 0,
-            createdAt: Date().addingTimeInterval(-3600),
-            status: .pending
-        ),
-        PrayerRequest(
-            id: "p2",
-            content: "Pray for guidance in my career decisions.",
-            authorId: "2",
-            isAnonymous: true,
-            prayerCount: 0,
-            createdAt: Date().addingTimeInterval(-7200),
-            status: .pending
-        ),
-        PrayerRequest(
-            id: "p3",
-            content: "Please lift up our youth group trip next weekend.",
-            authorId: "3",
-            authorName: "Sarah M.",
-            isAnonymous: false,
-            prayerCount: 0,
-            createdAt: Date().addingTimeInterval(-86400),
-            status: .pending
-        ),
-    ]
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
             Group {
-                if pendingRequests.isEmpty {
+                if isLoading {
+                    VStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                } else if let error = errorMessage {
+                    VStack(spacing: 12) {
+                        Spacer()
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.largeTitle)
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Button("Retry") {
+                            Task { await loadPendingPrayers() }
+                        }
+                        .buttonStyle(.bordered)
+                        Spacer()
+                    }
+                } else if pendingRequests.isEmpty {
                     EmptyModerationView()
                 } else {
                     List {
@@ -98,24 +88,73 @@ struct PrayerModerationView: View {
             } message: {
                 Text("This prayer request will not be shown on the Prayer Wall.")
             }
-            .onAppear {
-                pendingRequests = demoPendingRequests
+            .task {
+                await loadPendingPrayers()
+            }
+            .refreshable {
+                await loadPendingPrayers()
+            }
+        }
+    }
+
+    private func loadPendingPrayers() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let fetchedPrayers = try await PrayerAPI.shared.getPendingPrayers()
+            await MainActor.run {
+                pendingRequests = fetchedPrayers
+                isLoading = false
+            }
+        } catch {
+            print("Failed to load pending prayers: \(error)")
+            await MainActor.run {
+                errorMessage = "Failed to load pending prayers"
+                isLoading = false
             }
         }
     }
 
     private func approveRequest(_ request: PrayerRequest) {
-        withAnimation(ChurchTalkAnimations.smooth) {
-            pendingRequests.removeAll { $0.id == request.id }
+        Task {
+            do {
+                try await PrayerAPI.shared.approvePrayer(prayerId: request.id)
+                await MainActor.run {
+                    withAnimation(ChurchTalkAnimations.smooth) {
+                        pendingRequests.removeAll { $0.id == request.id }
+                    }
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                }
+            } catch {
+                print("Failed to approve prayer: \(error)")
+                await MainActor.run {
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
+            }
         }
-        // Haptic feedback
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
     }
 
     private func rejectRequest(_ request: PrayerRequest) {
-        withAnimation(ChurchTalkAnimations.smooth) {
-            pendingRequests.removeAll { $0.id == request.id }
+        Task {
+            do {
+                try await PrayerAPI.shared.rejectPrayer(prayerId: request.id)
+                await MainActor.run {
+                    withAnimation(ChurchTalkAnimations.smooth) {
+                        pendingRequests.removeAll { $0.id == request.id }
+                    }
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                }
+            } catch {
+                print("Failed to reject prayer: \(error)")
+                await MainActor.run {
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
+            }
         }
     }
 }

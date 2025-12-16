@@ -7,51 +7,10 @@ struct MyPrayersView: View {
     @State private var showDeleteConfirmation = false
     @State private var prayerToDelete: PrayerRequest?
 
-    // Demo data - in production, filter by authViewModel.currentMember?.id
-    @State private var myPrayers: [PrayerRequest] = [
-        PrayerRequest(
-            id: "my1",
-            content: "Please pray for my mother's health as she recovers from surgery.",
-            authorId: "currentUser",
-            authorName: "You",
-            isAnonymous: false,
-            prayerCount: 24,
-            createdAt: Date().addingTimeInterval(-86400),
-            status: .approved
-        ),
-        PrayerRequest(
-            id: "my2",
-            content: "Praying for guidance in my career decisions. Please stand with me.",
-            authorId: "currentUser",
-            authorName: "You",
-            isAnonymous: false,
-            prayerCount: 0,
-            createdAt: Date().addingTimeInterval(-3600),
-            status: .pending
-        ),
-        PrayerRequest(
-            id: "my3",
-            content: "Thankful for answered prayers regarding my family situation.",
-            authorId: "currentUser",
-            authorName: "You",
-            isAnonymous: true,
-            prayerCount: 18,
-            createdAt: Date().addingTimeInterval(-86400 * 3),
-            status: .approved
-        ),
-        PrayerRequest(
-            id: "my4",
-            content: "Request for healing.",
-            authorId: "currentUser",
-            authorName: "You",
-            isAnonymous: false,
-            prayerCount: 0,
-            createdAt: Date().addingTimeInterval(-86400 * 2),
-            status: .rejected,
-            reviewedBy: "Admin",
-            reviewedAt: Date().addingTimeInterval(-86400)
-        )
-    ]
+    // API data
+    @State private var myPrayers: [PrayerRequest] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var filteredPrayers: [PrayerRequest] {
         if let filter = selectedFilter {
@@ -117,7 +76,28 @@ struct MyPrayersView: View {
 
                 Divider()
 
-                if filteredPrayers.isEmpty {
+                if isLoading {
+                    VStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                } else if let error = errorMessage {
+                    VStack(spacing: 12) {
+                        Spacer()
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.largeTitle)
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Button("Retry") {
+                            Task { await loadMyPrayers() }
+                        }
+                        .buttonStyle(.bordered)
+                        Spacer()
+                    }
+                } else if filteredPrayers.isEmpty {
                     EmptyMyPrayersView(filter: selectedFilter)
                 } else {
                     List {
@@ -145,17 +125,62 @@ struct MyPrayersView: View {
                     Button("Done") { dismiss() }
                 }
             }
+            .task {
+                await loadMyPrayers()
+            }
+            .refreshable {
+                await loadMyPrayers()
+            }
             .alert("Delete Prayer?", isPresented: $showDeleteConfirmation) {
                 Button("Cancel", role: .cancel) { }
                 Button("Delete", role: .destructive) {
                     if let prayer = prayerToDelete {
-                        withAnimation {
-                            myPrayers.removeAll { $0.id == prayer.id }
-                        }
+                        deletePrayer(prayer)
                     }
                 }
             } message: {
                 Text("This prayer request will be permanently deleted.")
+            }
+        }
+    }
+
+    private func loadMyPrayers() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let fetchedPrayers = try await PrayerAPI.shared.getMyPrayers()
+            await MainActor.run {
+                myPrayers = fetchedPrayers
+                isLoading = false
+            }
+        } catch {
+            print("Failed to load my prayers: \(error)")
+            await MainActor.run {
+                errorMessage = "Failed to load your prayers"
+                isLoading = false
+            }
+        }
+    }
+
+    private func deletePrayer(_ prayer: PrayerRequest) {
+        Task {
+            do {
+                try await PrayerAPI.shared.deletePrayer(prayerId: prayer.id)
+                await MainActor.run {
+                    withAnimation {
+                        myPrayers.removeAll { $0.id == prayer.id }
+                    }
+
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                }
+            } catch {
+                print("Failed to delete prayer: \(error)")
+                await MainActor.run {
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
             }
         }
     }

@@ -339,4 +339,12 @@ class BulletinAPI {
         )
         return response.toComment()
     }
+
+    /// Delete a comment
+    /// - Parameters:
+    ///   - postId: The post ID
+    ///   - commentId: The comment ID to delete
+    func deleteComment(postId: String, commentId: String) async throws {
+        try await client.delete("/bulletin/\(postId)/comments/\(commentId)")
+    }
 }

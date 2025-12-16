@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct SRMDashboardView: View {
+    @EnvironmentObject var authViewModel: AuthViewModel
     @State private var souls: [Soul] = []
     @State private var stats = SRMStats.empty
     @State private var searchText = ""
@@ -8,17 +9,8 @@ struct SRMDashboardView: View {
     @State private var selectedStageFilter: SpiritualStage?
     @State private var showAddSoul = false
     @State private var selectedSoul: Soul?
-
-    // Demo souls
-    let demoSouls: [Soul] = [
-        Soul(id: "1", firstName: "Maria", lastName: "Garcia", email: "maria@email.com", phone: "(555) 111-2222", soulType: .prospect, spiritualStage: .gospelPresentation, assignedTo: "Pastor John", notes: "Met during outreach. Very interested.", lastContactDate: Date().addingTimeInterval(-86400 * 3), nextFollowUpDate: Date().addingTimeInterval(86400 * 2), createdAt: Date().addingTimeInterval(-86400 * 7), updatedAt: Date()),
-        Soul(id: "2", firstName: "James", lastName: "Wilson", email: "james@email.com", soulType: .visitor, spiritualStage: .saved, assignedTo: "Sarah M.", notes: "First time visitor. Salvation decision.", lastContactDate: Date().addingTimeInterval(-86400), createdAt: Date().addingTimeInterval(-86400 * 14), updatedAt: Date()),
-        Soul(id: "3", firstName: "Emily", lastName: "Chen", email: nil, phone: nil, soulType: .member, spiritualStage: .serving, assignedTo: nil, notes: nil, lastContactDate: nil, nextFollowUpDate: nil, createdAt: Date().addingTimeInterval(-86400 * 365), updatedAt: Date(), memberId: "m1"),
-        Soul(id: "4", firstName: "David", lastName: "Brown", phone: "(555) 333-4444", soulType: .prospect, spiritualStage: .initialContact, notes: "Knocked on door. Open to learning more.", lastContactDate: Date().addingTimeInterval(-86400 * 5), nextFollowUpDate: Date(), createdAt: Date().addingTimeInterval(-86400 * 5), updatedAt: Date()),
-        Soul(id: "5", firstName: "Sarah", lastName: "Johnson", email: "sarah.j@email.com", soulType: .visitor, spiritualStage: .baptized, notes: "Baptized last Sunday!", lastContactDate: Date().addingTimeInterval(-86400 * 2), createdAt: Date().addingTimeInterval(-86400 * 30), updatedAt: Date()),
-        Soul(id: "6", firstName: "Michael", lastName: "Lee", email: nil, phone: nil, soulType: .member, spiritualStage: .discipleship, assignedTo: nil, notes: nil, lastContactDate: nil, nextFollowUpDate: nil, createdAt: Date().addingTimeInterval(-86400 * 180), updatedAt: Date(), memberId: "m2"),
-        Soul(id: "7", firstName: "Jessica", lastName: "Martinez", phone: "(555) 555-6666", soulType: .prospect, spiritualStage: .saved, assignedTo: "Pastor John", notes: "Ready for baptism class.", nextFollowUpDate: Date().addingTimeInterval(86400 * 7), createdAt: Date().addingTimeInterval(-86400 * 21), updatedAt: Date()),
-    ]
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var filteredSouls: [Soul] {
         souls.filter { soul in
@@ -62,7 +54,28 @@ struct SRMDashboardView: View {
                 .padding(.bottom, 8)
 
                 // Souls List
-                if filteredSouls.isEmpty {
+                if isLoading {
+                    VStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                } else if let error = errorMessage {
+                    VStack(spacing: 12) {
+                        Spacer()
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.largeTitle)
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Button("Retry") {
+                            Task { await loadSouls() }
+                        }
+                        .buttonStyle(.bordered)
+                        Spacer()
+                    }
+                } else if filteredSouls.isEmpty {
                     EmptySoulsView()
                 } else {
                     List {
@@ -98,9 +111,32 @@ struct SRMDashboardView: View {
             .sheet(item: $selectedSoul) { soul in
                 SoulDetailView(soul: soul)
             }
-            .onAppear {
-                souls = demoSouls
+            .task {
+                await loadSouls()
+            }
+            .refreshable {
+                await loadSouls()
+            }
+        }
+    }
+
+    private func loadSouls() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            // Load all shared souls for the church (admin view)
+            let fetchedSouls = try await SoulsAPI.shared.getSouls(shareStatus: "shared", limit: 500)
+            await MainActor.run {
+                souls = fetchedSouls
                 stats = SRMStats.calculate(from: souls)
+                isLoading = false
+            }
+        } catch {
+            print("Failed to load souls: \(error)")
+            await MainActor.run {
+                errorMessage = "Failed to load souls"
+                isLoading = false
             }
         }
     }
@@ -709,6 +745,8 @@ struct AddSoulView: View {
     @State private var soulType: SoulType = .prospect
     @State private var spiritualStage: SpiritualStage = .initialContact
     @State private var notes = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
 
     let onSave: (Soul) -> Void
 
@@ -758,39 +796,67 @@ struct AddSoulView: View {
                     Button("Cancel") { dismiss() }
                 }
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
-                        saveSoul()
+                    if isSaving {
+                        ProgressView()
+                    } else {
+                        Button("Save") {
+                            saveSoul()
+                        }
+                        .fontWeight(.bold)
+                        .foregroundColor(.churchTalkRed)
+                        .disabled(!isValid)
                     }
-                    .fontWeight(.bold)
-                    .foregroundColor(.churchTalkRed)
-                    .disabled(!isValid)
                 }
             }
+            .alert("Error", isPresented: .constant(errorMessage != nil)) {
+                Button("OK") { errorMessage = nil }
+            } message: {
+                Text(errorMessage ?? "")
+            }
+            .disabled(isSaving)
         }
     }
 
     private func saveSoul() {
-        let newSoul = Soul(
-            id: UUID().uuidString,
-            firstName: firstName.trimmingCharacters(in: .whitespaces),
-            lastName: lastName.trimmingCharacters(in: .whitespaces),
-            email: email.isEmpty ? nil : email,
-            phone: phone.isEmpty ? nil : phone,
-            soulType: soulType,
-            spiritualStage: spiritualStage,
-            notes: notes.isEmpty ? nil : notes,
-            createdAt: Date(),
-            updatedAt: Date()
-        )
+        isSaving = true
+        errorMessage = nil
 
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.success)
+        Task {
+            do {
+                let request = CreateSoulRequest(
+                    firstName: firstName.trimmingCharacters(in: .whitespaces),
+                    lastName: lastName.trimmingCharacters(in: .whitespaces),
+                    email: email.isEmpty ? nil : email,
+                    phone: phone.isEmpty ? nil : phone,
+                    soulType: soulType.rawValue,
+                    spiritualStage: spiritualStage.rawValue,
+                    notes: notes.isEmpty ? nil : notes
+                )
 
-        onSave(newSoul)
-        dismiss()
+                let newSoul = try await SoulsAPI.shared.createSoul(request: request)
+
+                await MainActor.run {
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+
+                    onSave(newSoul)
+                    dismiss()
+                }
+            } catch {
+                print("Failed to save soul: \(error)")
+                await MainActor.run {
+                    errorMessage = "Failed to save. Please try again."
+                    isSaving = false
+
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
+            }
+        }
     }
 }
 
 #Preview {
     SRMDashboardView()
+        .environmentObject(AuthViewModel())
 }

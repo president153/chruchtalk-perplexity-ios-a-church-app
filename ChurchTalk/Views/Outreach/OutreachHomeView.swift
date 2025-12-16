@@ -1,16 +1,19 @@
 import SwiftUI
 
 struct OutreachHomeView: View {
-    @State private var territories: [Territory] = [
-        Territory(id: "1", name: "Downtown Lancaster", status: .assigned, progress: 45),
-        Territory(id: "2", name: "East Side", status: .inProgress, progress: 72),
-        Territory(id: "3", name: "North Lancaster", status: .unassigned, progress: 0),
-    ]
+    @EnvironmentObject var authViewModel: AuthViewModel
+    @State private var territories: [Territory] = []
+    @State private var isLoadingTerritories = true
+    @State private var territoriesError: String?
     @State private var showMySouls = false
     @State private var showSRMDashboard = false
 
-    // Personal outreach stats
-    let myStats = (doorsKnocked: 127, soulsAdded: 18, followUps: 12)
+    // Stats from API
+    @State private var doorsKnocked: Int = 0
+    @State private var soulsAdded: Int = 0
+    @State private var followUps: Int = 0
+    @State private var territoriesAssigned: Int = 0
+    @State private var isLoadingStats = true
 
     var body: some View {
         NavigationStack {
@@ -22,16 +25,16 @@ struct OutreachHomeView: View {
                             Text("My Outreach Stats")
                                 .font(.headline)
                             Spacer()
-                            Text("This Month")
+                            Text("All Time")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                         }
                         .padding(.horizontal)
 
                         HStack(spacing: 12) {
-                            PersonalStatCard(value: "\(myStats.doorsKnocked)", label: "Doors Knocked", icon: "door.left.hand.closed", color: .churchTalkRed)
-                            PersonalStatCard(value: "\(myStats.soulsAdded)", label: "Souls Added", icon: "star.fill", color: .orange)
-                            PersonalStatCard(value: "\(myStats.followUps)", label: "Follow-ups", icon: "arrow.triangle.2.circlepath", color: .green)
+                            PersonalStatCard(value: isLoadingStats ? "-" : "\(doorsKnocked)", label: "Doors Knocked", icon: "door.left.hand.closed", color: .churchTalkRed)
+                            PersonalStatCard(value: isLoadingStats ? "-" : "\(soulsAdded)", label: "Souls Added", icon: "star.fill", color: .orange)
+                            PersonalStatCard(value: isLoadingStats ? "-" : "\(followUps)", label: "Follow-ups", icon: "arrow.triangle.2.circlepath", color: .green)
                         }
                         .padding(.horizontal)
                     }
@@ -56,20 +59,60 @@ struct OutreachHomeView: View {
                     // Territory List
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            Text("My Territories")
+                            Text("Territories")
                                 .font(.headline)
                             Spacer()
-                            Text("\(territories.count) assigned")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                            if !isLoadingTerritories {
+                                Text("\(territoriesAssigned) assigned to me")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
                         .padding(.horizontal)
 
-                        ForEach(territories) { territory in
-                            NavigationLink(destination: TerritoryDetailView(territory: territory)) {
-                                TerritoryCard(territory: territory)
+                        if isLoadingTerritories {
+                            HStack {
+                                Spacer()
+                                ProgressView()
+                                Spacer()
                             }
-                            .buttonStyle(PlainButtonStyle())
+                            .padding(.vertical, 20)
+                        } else if let error = territoriesError {
+                            VStack(spacing: 12) {
+                                Image(systemName: "wifi.exclamationmark")
+                                    .font(.title2)
+                                    .foregroundColor(.orange)
+                                Text(error)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                Button("Retry") {
+                                    Task { await loadTerritories() }
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 20)
+                        } else if territories.isEmpty {
+                            VStack(spacing: 12) {
+                                Image(systemName: "map")
+                                    .font(.title2)
+                                    .foregroundColor(.secondary)
+                                Text("No territories available")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                Text("Ask your admin to create territories")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 20)
+                        } else {
+                            ForEach(territories) { territory in
+                                NavigationLink(destination: TerritoryDetailView(territory: territory)) {
+                                    TerritoryCard(territory: territory)
+                                }
+                                .buttonStyle(PlainButtonStyle())
+                            }
                         }
                     }
                 }
@@ -89,6 +132,72 @@ struct OutreachHomeView: View {
             }
             .sheet(isPresented: $showSRMDashboard) {
                 SRMDashboardView()
+                    .environmentObject(authViewModel)
+            }
+            .task {
+                await loadData()
+            }
+            .refreshable {
+                await loadData()
+            }
+        }
+    }
+
+    private func loadData() async {
+        await withTaskGroup(of: Void.self) { group in
+            group.addTask { await loadStats() }
+            group.addTask { await loadTerritories() }
+        }
+    }
+
+    private func loadStats() async {
+        isLoadingStats = true
+
+        // Load outreach stats from API
+        do {
+            let stats = try await OutreachAPI.shared.getStats()
+            await MainActor.run {
+                doorsKnocked = stats.doorsKnocked
+                followUps = stats.followUps
+                territoriesAssigned = stats.territoriesAssigned
+            }
+        } catch {
+            print("Failed to load outreach stats: \(error)")
+            // Fallback: keep current values
+        }
+
+        // Load souls added count
+        do {
+            let souls = try await SoulsAPI.shared.getSouls(mine: true, limit: 1000)
+            await MainActor.run {
+                soulsAdded = souls.count
+            }
+        } catch {
+            print("Failed to load souls: \(error)")
+        }
+
+        await MainActor.run {
+            isLoadingStats = false
+        }
+    }
+
+    private func loadTerritories() async {
+        await MainActor.run {
+            isLoadingTerritories = true
+            territoriesError = nil
+        }
+
+        do {
+            let fetchedTerritories = try await OutreachAPI.shared.getTerritories()
+            await MainActor.run {
+                territories = fetchedTerritories
+                isLoadingTerritories = false
+            }
+        } catch {
+            print("Failed to load territories: \(error)")
+            await MainActor.run {
+                territoriesError = "Failed to load territories"
+                isLoadingTerritories = false
             }
         }
     }
@@ -194,7 +303,7 @@ struct TerritoryCard: View {
                     Text(territory.name)
                         .font(.headline)
 
-                    Text(territory.status.rawValue.replacingOccurrences(of: "_", with: " ").capitalized)
+                    Text(territory.status.displayName)
                         .font(.caption)
                         .foregroundColor(statusColor)
                 }
@@ -243,4 +352,5 @@ struct TerritoryCard: View {
 
 #Preview {
     OutreachHomeView()
+        .environmentObject(AuthViewModel())
 }

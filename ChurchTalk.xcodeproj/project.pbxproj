@@ -81,6 +81,13 @@
 		AABBCC0ADEADBEEF00000005 /* BulletinAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC09DEADBEEF00000005 /* BulletinAPI.swift */; };
 		AABBCC0CDEADBEEF00000006 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC0BDEADBEEF00000006 /* NotificationService.swift */; };
 		AABBCC0EDEADBEEF00000007 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC0DDEADBEEF00000007 /* AppDelegate.swift */; };
+		AABBCC10DEADBEEF00000008 /* PrayerAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC11DEADBEEF00000008 /* PrayerAPI.swift */; };
+		AABBCC12DEADBEEF00000009 /* EventsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC13DEADBEEF00000009 /* EventsAPI.swift */; };
+		AABBCC14DEADBEEF0000000A /* SoulsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC15DEADBEEF0000000A /* SoulsAPI.swift */; };
+		AABBCC16DEADBEEF0000000B /* GroupsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC17DEADBEEF0000000B /* GroupsAPI.swift */; };
+		AABBCC18DEADBEEF0000000C /* OutreachAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC19DEADBEEF0000000C /* OutreachAPI.swift */; };
+		AABBCC1ADEADBEEF0000000D /* UploadsAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC1BDEADBEEF0000000D /* UploadsAPI.swift */; };
+		AABBCC1CDEADBEEF0000000E /* ChurchAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABBCC1DDEADBEEF0000000E /* ChurchAPI.swift */; };
 		ADE07B6B7B639B7B98CAE1C2 /* EventsTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 912CCCBDBA01BEDEB10D8061 /* EventsTabView.swift */; };
 		ADF879F2307F2AFAC18119A0 /* ScaleButtonStyle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 60411F4609E29A5B40F58C3F /* ScaleButtonStyle.swift */; };
 		B36173517B7ADE598068CA06 /* PendingApprovalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 602BA20BA0EF38E2E73FB601 /* PendingApprovalView.swift */; };
@@ -182,6 +189,13 @@
 		AABBCC09DEADBEEF00000005 /* BulletinAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BulletinAPI.swift; sourceTree = "<group>"; };
 		AABBCC0BDEADBEEF00000006 /* NotificationService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		AABBCC0DDEADBEEF00000007 /* AppDelegate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		AABBCC11DEADBEEF00000008 /* PrayerAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PrayerAPI.swift; sourceTree = "<group>"; };
+		AABBCC13DEADBEEF00000009 /* EventsAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EventsAPI.swift; sourceTree = "<group>"; };
+		AABBCC15DEADBEEF0000000A /* SoulsAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SoulsAPI.swift; sourceTree = "<group>"; };
+		AABBCC17DEADBEEF0000000B /* GroupsAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GroupsAPI.swift; sourceTree = "<group>"; };
+		AABBCC19DEADBEEF0000000C /* OutreachAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = OutreachAPI.swift; sourceTree = "<group>"; };
+		AABBCC1BDEADBEEF0000000D /* UploadsAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = UploadsAPI.swift; sourceTree = "<group>"; };
+		AABBCC1DDEADBEEF0000000E /* ChurchAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChurchAPI.swift; sourceTree = "<group>"; };
 		AF3F5FB023F4ABCE18DCD8C7 /* EmailVerificationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmailVerificationView.swift; sourceTree = "<group>"; };
 		B3874FF954004C319A22D48B /* BibleReferenceChip.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BibleReferenceChip.swift; sourceTree = "<group>"; };
 		B920B40CF057D4230BB1A0EF /* ImagePicker.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImagePicker.swift; sourceTree = "<group>"; };
@@ -226,7 +240,6 @@
 			children = (
 				202CB0F7978169151952679C /* ChurchProfileEditorView.swift */,
 			);
-			name = Admin;
 			path = Admin;
 			sourceTree = "<group>";
 		};
@@ -238,7 +251,6 @@
 				934782519720FDF9CB8AE93D /* QuickActionsRow.swift */,
 				4F9E4E59192CD6AF64461AE8 /* UpcomingEventsCarousel.swift */,
 			);
-			name = Home;
 			path = Home;
 			sourceTree = "<group>";
 		};
@@ -247,7 +259,6 @@
 			children = (
 				497DDA821FD4EF2348233B19 /* ServeTabView.swift */,
 			);
-			name = Serve;
 			path = Serve;
 			sourceTree = "<group>";
 		};
@@ -257,7 +268,6 @@
 				971DBCCF4FA9EBCD3241D58B /* Colors.swift */,
 				C056A1A9AE392C7690E4ECC9 /* Animations.swift */,
 			);
-			name = Theme;
 			path = Theme;
 			sourceTree = "<group>";
 		};
@@ -299,7 +309,6 @@
 				7E6F9DD10472E0AFF4A620D6 /* PostTypeBadge.swift */,
 				B3874FF954004C319A22D48B /* BibleReferenceChip.swift */,
 			);
-			name = Components;
 			path = Components;
 			sourceTree = "<group>";
 		};
@@ -310,7 +319,6 @@
 				96D60139807527ADF562839C /* StoryCircle.swift */,
 				FD7B052B4A74E3A6C758F7F2 /* StoryViewer.swift */,
 			);
-			name = Stories;
 			path = Stories;
 			sourceTree = "<group>";
 		};
@@ -320,7 +328,6 @@
 				F31912965940A23241FC0B21 /* SRMDashboardView.swift */,
 				5C912C356226CAD8ADF0389A /* MySoulsView.swift */,
 			);
-			name = SRM;
 			path = SRM;
 			sourceTree = "<group>";
 		};
@@ -514,7 +521,6 @@
 			children = (
 				C3925B43CE1F30EBB7FDA77A /* ConnectTabView.swift */,
 			);
-			name = Connect;
 			path = Connect;
 			sourceTree = "<group>";
 		};
@@ -524,7 +530,6 @@
 				8E37B1D28A5B6C373F266385 /* FundTypesView.swift */,
 				23954B6AC1549F56DBAC8797 /* FundTypeCard.swift */,
 			);
-			name = Giving;
 			path = Giving;
 			sourceTree = "<group>";
 		};
@@ -534,14 +539,20 @@
 				AABBCC02DEADBEEF00000001 /* APIClient.swift */,
 				AABBCC04DEADBEEF00000002 /* AuthAPI.swift */,
 				AABBCC09DEADBEEF00000005 /* BulletinAPI.swift */,
+				AABBCC13DEADBEEF00000009 /* EventsAPI.swift */,
+				AABBCC15DEADBEEF0000000A /* SoulsAPI.swift */,
+				AABBCC17DEADBEEF0000000B /* GroupsAPI.swift */,
+				AABBCC19DEADBEEF0000000C /* OutreachAPI.swift */,
+				AABBCC1BDEADBEEF0000000D /* UploadsAPI.swift */,
+				AABBCC11DEADBEEF00000008 /* PrayerAPI.swift */,
 				3E27F52822F90C09CB8154FA /* CalendarService.swift */,
 				AABBCC06DEADBEEF00000003 /* MembersAPI.swift */,
+				AABBCC1DDEADBEEF0000000E /* ChurchAPI.swift */,
 				AABBCC0BDEADBEEF00000006 /* NotificationService.swift */,
 				F0E078A9871EB30D8B717087 /* AnalyticsAPI.swift */,
 				790E4A77C36BFFB0E772DCAB /* BulletinAPI.swift */,
 				F4B82F3FE05C7F9613092CD8 /* NotificationService.swift */,
 			);
-			name = Services;
 			path = Services;
 			sourceTree = "<group>";
 		};
@@ -550,7 +561,6 @@
 			children = (
 				C30DA80ABEA299B37B051F00 /* HapticManager.swift */,
 			);
-			name = Managers;
 			path = Managers;
 			sourceTree = "<group>";
 		};
@@ -605,7 +615,7 @@
 			attributes = {
 				BuildIndependentTargetsInParallel = 1;
 				LastSwiftUpdateCheck = 1500;
-				LastUpgradeCheck = 1500;
+				LastUpgradeCheck = 2610;
 				TargetAttributes = {
 					A100FFFF201AAAAA00000000 = {
 						CreatedOnToolsVersion = 15.0;
@@ -703,6 +713,13 @@
 				AABBCC05DEADBEEF00000003 /* MembersAPI.swift in Sources */,
 				AABBCC07DEADBEEF00000004 /* Environment.swift in Sources */,
 				AABBCC0ADEADBEEF00000005 /* BulletinAPI.swift in Sources */,
+				AABBCC10DEADBEEF00000008 /* PrayerAPI.swift in Sources */,
+				AABBCC12DEADBEEF00000009 /* EventsAPI.swift in Sources */,
+				AABBCC14DEADBEEF0000000A /* SoulsAPI.swift in Sources */,
+				AABBCC16DEADBEEF0000000B /* GroupsAPI.swift in Sources */,
+				AABBCC18DEADBEEF0000000C /* OutreachAPI.swift in Sources */,
+				AABBCC1ADEADBEEF0000000D /* UploadsAPI.swift in Sources */,
+				AABBCC1CDEADBEEF0000000E /* ChurchAPI.swift in Sources */,
 				AABBCC0CDEADBEEF00000006 /* NotificationService.swift in Sources */,
 				AABBCC0EDEADBEEF00000007 /* AppDelegate.swift in Sources */,
 				C03E4BC29DE7E3DFB9337A32 /* NotificationSettingsView.swift in Sources */,
@@ -779,6 +796,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = ZFN475769Z;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -802,6 +820,7 @@
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
@@ -842,6 +861,7 @@
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = ZFN475769Z;
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -858,6 +878,7 @@
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				VALIDATE_PRODUCT = YES;
 			};
@@ -871,7 +892,6 @@
 				CODE_SIGN_ENTITLEMENTS = ChurchTalk/ChurchTalk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 34;
-				DEVELOPMENT_TEAM = ZFN475769Z;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "A Church App";
@@ -901,7 +921,6 @@
 				CODE_SIGN_ENTITLEMENTS = ChurchTalk/ChurchTalk.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 34;
-				DEVELOPMENT_TEAM = ZFN475769Z;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "A Church App";

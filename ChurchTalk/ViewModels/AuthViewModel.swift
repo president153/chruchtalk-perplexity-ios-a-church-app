@@ -28,32 +28,115 @@ class AuthViewModel: ObservableObject {
     // MARK: - Init
 
     init() {
-        // Auto-login as bernard@aboundfi.com for development
-        // Remove this init() block when wiring real auth
-        user = User(
-            id: "user-bernard-001",
-            email: "bernard@aboundfi.com",
-            name: "Pastor Bernard",
-            isEmailVerified: true
-        )
+        // Check for saved auth token and restore session
+        Task {
+            await restoreSession()
+        }
 
-        currentChurch = Church(
-            id: "000000000000000000000003",
-            name: "Norwalk Baptist Church",
-            city: "Norwalk",
-            state: "CA",
-            memberCount: 150
-        )
+        // Listen for unauthorized API responses to trigger logout
+        NotificationCenter.default.addObserver(
+            forName: .apiUnauthorized,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleUnauthorized()
+        }
+    }
 
-        currentMember = Member(
-            id: "member-bernard-001",
-            firstName: "Bernard",
-            lastName: "Moses",
-            email: "bernard@aboundfi.com",
-            phone: nil,
-            churchId: "000000000000000000000003",
-            role: .admin
-        )
+    // MARK: - Handle Unauthorized
+
+    private func handleUnauthorized() {
+        // Only logout if we think we're authenticated
+        // This prevents logout loops
+        if isAuthenticated {
+            print("⚠️ API returned 401 - logging out")
+            logout()
+        }
+    }
+
+    // MARK: - Restore Session
+
+    /// Restore auth session from saved tokens on app launch
+    func restoreSession() async {
+        // In demo mode, auto-authenticate using the dev mode headers
+        if AppConfig.isDemoMode {
+            do {
+                // Fetch current member data (uses X-Dev-Mode and X-Member-Id headers)
+                let member = try await MembersAPI.shared.getCurrentMember()
+
+                // Fetch church data
+                var church: Church?
+                if let churchId = member.churchId {
+                    church = try? await ChurchAPI.shared.getChurch(id: churchId)
+                }
+
+                await MainActor.run {
+                    self.currentMember = member
+                    self.currentChurch = church
+                    self.isAuthenticated = true
+                    self.isEmailVerified = true
+                    self.isPendingApproval = member.isPendingApproval ?? false
+
+                    // Create user from member data
+                    self.user = User(
+                        id: member.userId ?? member.id,
+                        email: member.email,
+                        name: member.fullName,
+                        isEmailVerified: true,
+                        profileUrl: member.profilePhotoUrl
+                    )
+                }
+                return
+            } catch {
+                print("Demo mode fetch failed: \(error)")
+            }
+        }
+
+        // Non-demo mode: check for saved token in Keychain
+        guard let savedToken = KeychainService.shared.accessToken else {
+            // No saved token - user needs to log in
+            await MainActor.run {
+                isAuthenticated = false
+            }
+            return
+        }
+
+        // Set token to API client
+        APIClient.shared.authToken = savedToken
+
+        do {
+            // Fetch current member data
+            let member = try await MembersAPI.shared.getCurrentMember()
+
+            // Fetch church data if member has a church
+            var church: Church?
+            if let churchId = member.churchId {
+                church = try? await ChurchAPI.shared.getChurch(id: churchId)
+            }
+
+            await MainActor.run {
+                self.currentMember = member
+                self.currentChurch = church
+                self.isAuthenticated = true
+                self.isEmailVerified = true
+                self.isPendingApproval = member.isPendingApproval ?? false
+
+                // Create user from member data
+                self.user = User(
+                    id: member.userId ?? member.id,
+                    email: member.email,
+                    name: member.fullName,
+                    isEmailVerified: true,
+                    profileUrl: member.profilePhotoUrl
+                )
+            }
+        } catch {
+            // Token invalid or expired - clear and require login
+            print("Failed to restore session: \(error)")
+            await MainActor.run {
+                logout()
+            }
+        }
     }
 
     // MARK: - Login
@@ -69,9 +152,11 @@ class AuthViewModel: ObservableObject {
             // Store auth token
             APIClient.shared.authToken = response.accessToken
 
-            // Store tokens for later refresh
-            UserDefaults.standard.set(response.refreshToken, forKey: "refreshToken")
-            UserDefaults.standard.set(response.accessToken, forKey: "accessToken")
+            // Store tokens securely in Keychain for later refresh
+            KeychainService.shared.saveTokens(
+                accessToken: response.accessToken,
+                refreshToken: response.refreshToken
+            )
 
             // Map user response to User model
             user = User(
@@ -85,10 +170,13 @@ class AuthViewModel: ObservableObject {
             // Set member if returned (user already joined a church)
             currentMember = response.member
 
-            // TODO: Fetch church details if member exists
-            if let member = response.member {
-                // For now, store church ID - will fetch church details later
-                UserDefaults.standard.set(member.churchId, forKey: "currentChurchId")
+            // Fetch church details if member exists
+            if let member = response.member, let churchId = member.churchId {
+                KeychainService.shared.churchId = churchId
+                // Fetch church data
+                if let church = try? await ChurchAPI.shared.getChurch(id: churchId) {
+                    currentChurch = church
+                }
             }
 
             isAuthenticated = true
@@ -282,12 +370,12 @@ class AuthViewModel: ObservableObject {
         pendingMember = nil
         pendingVerificationEmail = nil
 
-        // Clear stored tokens
+        // Clear stored tokens from Keychain
         APIClient.shared.authToken = nil
+        KeychainService.shared.clearAll()
+
+        // Clear other UserDefaults
         UserDefaults.standard.removeObject(forKey: "currentChurchName")
-        UserDefaults.standard.removeObject(forKey: "currentChurchId")
-        UserDefaults.standard.removeObject(forKey: "accessToken")
-        UserDefaults.standard.removeObject(forKey: "refreshToken")
     }
 
     func signOut() {

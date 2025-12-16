@@ -206,11 +206,30 @@ struct EventRegistrationSheet: View {
     private func submitRegistration() {
         isSubmitting = true
 
-        // Simulate API call
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            isSubmitting = false
-            withAnimation {
-                showConfirmation = true
+        Task {
+            do {
+                _ = try await EventsAPI.shared.registerForEvent(
+                    eventId: event.id,
+                    guestCount: guestCount,
+                    notes: notes.isEmpty ? nil : notes
+                )
+                await MainActor.run {
+                    isSubmitting = false
+                    withAnimation {
+                        showConfirmation = true
+                    }
+
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                }
+            } catch {
+                print("Failed to register: \(error)")
+                await MainActor.run {
+                    isSubmitting = false
+
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
             }
         }
     }

@@ -261,10 +261,11 @@ struct EventDetailView: View {
                 }
             }
             .ignoresSafeArea(edges: .top)
-            .overlay(alignment: .bottom) {
+            .safeAreaInset(edge: .bottom) {
                 // Register Button
                 if event.requiresRegistration && !event.isPast {
-                    VStack {
+                    VStack(spacing: 0) {
+                        Divider()
                         Button {
                             if isRegistered {
                                 isRegistered = false
@@ -279,13 +280,15 @@ struct EventDetailView: View {
                             .font(.headline)
                             .foregroundColor(.white)
                             .frame(maxWidth: .infinity)
-                            .padding()
+                            .padding(.vertical, 16)
                             .background(isRegistered ? Color.amenGreen : (event.isFull ? Color.orange : Color.churchTalkRed))
                             .cornerRadius(ChurchTalkTheme.cornerRadius)
                         }
                         .disabled(event.isPast)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
                     }
-                    .padding()
                     .background(.ultraThinMaterial)
                 }
             }

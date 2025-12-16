@@ -61,37 +61,9 @@ struct ConnectTabView: View {
 struct ConnectPrayerSectionView: View {
     @State private var showNewPrayerSheet = false
     @State private var showMyPrayers = false
-
-    // Demo data using existing PrayerRequest model
-    let prayerRequests = [
-        PrayerRequest(
-            id: "1",
-            content: "Please pray for my mother's health as she recovers from surgery.",
-            authorId: "1",
-            authorName: "Sarah M.",
-            isAnonymous: false,
-            prayerCount: 24,
-            createdAt: Date().addingTimeInterval(-3600)
-        ),
-        PrayerRequest(
-            id: "2",
-            content: "Praying for guidance in a difficult work situation.",
-            authorId: "2",
-            authorName: nil,
-            isAnonymous: true,
-            prayerCount: 18,
-            createdAt: Date().addingTimeInterval(-7200)
-        ),
-        PrayerRequest(
-            id: "3",
-            content: "Thankful for answered prayers! Our family has been blessed.",
-            authorId: "3",
-            authorName: "John D.",
-            isAnonymous: false,
-            prayerCount: 32,
-            createdAt: Date().addingTimeInterval(-86400)
-        )
-    ]
+    @State private var prayerRequests: [PrayerRequest] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var body: some View {
         ScrollView {
@@ -128,24 +100,97 @@ struct ConnectPrayerSectionView: View {
                 .padding(.horizontal)
 
                 // Prayer Requests
-                ForEach(prayerRequests) { request in
-                    ConnectPrayerCard(request: request)
+                if isLoading {
+                    ProgressView()
+                        .padding(.top, 40)
+                } else if let error = errorMessage {
+                    VStack(spacing: 12) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.largeTitle)
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Button("Retry") {
+                            Task { await loadPrayers() }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .padding(.top, 40)
+                } else if prayerRequests.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "hands.sparkles")
+                            .font(.largeTitle)
+                            .foregroundColor(.secondary)
+                        Text("No prayer requests yet")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.top, 40)
+                } else {
+                    ForEach(prayerRequests) { request in
+                        ConnectPrayerCard(request: request, onPrayerCountUpdated: { updatedPrayer in
+                            if let index = prayerRequests.firstIndex(where: { $0.id == updatedPrayer.id }) {
+                                prayerRequests[index] = updatedPrayer
+                            }
+                        })
+                    }
                 }
+
+                // Bottom padding for tab bar
+                Color.clear.frame(height: 90)
             }
             .padding(.vertical)
         }
+        .task {
+            await loadPrayers()
+        }
+        .refreshable {
+            await loadPrayers()
+        }
         .sheet(isPresented: $showNewPrayerSheet) {
-            NewPrayerRequestView()
+            NewPrayerRequestView(onPrayerCreated: {
+                Task { await loadPrayers() }
+            })
         }
         .sheet(isPresented: $showMyPrayers) {
             MyPrayersView()
+        }
+    }
+
+    private func loadPrayers() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let fetchedPrayers = try await PrayerAPI.shared.getPrayers(limit: 20)
+            await MainActor.run {
+                prayerRequests = fetchedPrayers
+                isLoading = false
+            }
+        } catch {
+            print("Failed to load prayers: \(error)")
+            await MainActor.run {
+                errorMessage = "Failed to load prayers"
+                isLoading = false
+            }
         }
     }
 }
 
 struct ConnectPrayerCard: View {
     let request: PrayerRequest
-    @State private var hasPrayed = false
+    var onPrayerCountUpdated: ((PrayerRequest) -> Void)? = nil
+    @State private var hasPrayed: Bool
+    @State private var currentPrayerCount: Int
+    @State private var isSubmitting = false
+
+    init(request: PrayerRequest, onPrayerCountUpdated: ((PrayerRequest) -> Void)? = nil) {
+        self.request = request
+        self.onPrayerCountUpdated = onPrayerCountUpdated
+        self._hasPrayed = State(initialValue: request.hasPrayed)
+        self._currentPrayerCount = State(initialValue: request.prayerCount)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -180,16 +225,21 @@ struct ConnectPrayerCard: View {
 
             // Pray Button
             HStack {
-                Button(action: { hasPrayed.toggle() }) {
+                Button(action: {
+                    if !hasPrayed && !isSubmitting {
+                        prayForRequest()
+                    }
+                }) {
                     HStack(spacing: 6) {
                         Image(systemName: hasPrayed ? "hands.sparkles.fill" : "hands.sparkles")
                             .foregroundColor(hasPrayed ? .purple : .secondary)
 
-                        Text("\(request.prayerCount + (hasPrayed ? 1 : 0)) prayers")
+                        Text("\(currentPrayerCount) prayers")
                             .foregroundColor(hasPrayed ? .purple : .secondary)
                     }
                     .font(.subheadline)
                 }
+                .disabled(hasPrayed)
 
                 Spacer()
             }
@@ -200,19 +250,52 @@ struct ConnectPrayerCard: View {
         .shadow(color: Color.black.opacity(0.05), radius: 5, y: 2)
         .padding(.horizontal)
     }
+
+    private func prayForRequest() {
+        isSubmitting = true
+        hasPrayed = true
+        currentPrayerCount += 1
+
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+
+        Task {
+            do {
+                let response = try await PrayerAPI.shared.prayFor(prayerId: request.id)
+                await MainActor.run {
+                    // Handle both success and "already prayed" responses
+                    if response.message != nil {
+                        // Already prayed - keep current state
+                        isSubmitting = false
+                    } else {
+                        // Success - update with server values
+                        currentPrayerCount = response.prayerCount ?? currentPrayerCount
+                        hasPrayed = response.hasPrayed ?? true
+                        isSubmitting = false
+
+                        var updatedRequest = request
+                        updatedRequest.prayerCount = response.prayerCount ?? currentPrayerCount
+                        updatedRequest.hasPrayed = response.hasPrayed ?? true
+                        onPrayerCountUpdated?(updatedRequest)
+                    }
+                }
+            } catch {
+                print("Failed to pray: \(error)")
+                await MainActor.run {
+                    currentPrayerCount -= 1
+                    hasPrayed = false
+                    isSubmitting = false
+                }
+            }
+        }
+    }
 }
 
 struct ConnectDirectorySectionView: View {
     let searchText: String
-
-    // Demo members
-    let members = [
-        Member(id: "1", firstName: "John", lastName: "Anderson", email: "john@church.org", churchId: "1"),
-        Member(id: "2", firstName: "Sarah", lastName: "Baker", email: "sarah@church.org", churchId: "1"),
-        Member(id: "3", firstName: "Mike", lastName: "Chen", email: "mike@church.org", churchId: "1"),
-        Member(id: "4", firstName: "Emily", lastName: "Davis", email: "emily@church.org", churchId: "1"),
-        Member(id: "5", firstName: "David", lastName: "Evans", email: "david@church.org", churchId: "1"),
-    ]
+    @State private var members: [Member] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var filteredMembers: [Member] {
         if searchText.isEmpty {
@@ -224,215 +307,279 @@ struct ConnectDirectorySectionView: View {
     }
 
     var body: some View {
-        List {
-            ForEach(filteredMembers) { member in
-                NavigationLink(destination: MemberProfileView(member: member)) {
-                    HStack(spacing: 12) {
-                        Circle()
-                            .fill(Color.churchTalkRed.opacity(0.2))
-                            .frame(width: 44, height: 44)
-                            .overlay(
-                                Text(member.initials)
-                                    .font(.headline)
-                                    .foregroundColor(.churchTalkRed)
-                            )
+        Group {
+            if isLoading {
+                VStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+            } else if let error = errorMessage {
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "wifi.exclamationmark")
+                        .font(.largeTitle)
+                        .foregroundColor(.orange)
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Button("Retry") {
+                        Task { await loadMembers() }
+                    }
+                    .buttonStyle(.bordered)
+                    Spacer()
+                }
+            } else if members.isEmpty {
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "person.2.slash")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text("No members found")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+            } else {
+                List {
+                    ForEach(filteredMembers) { member in
+                        NavigationLink(destination: MemberProfileView(member: member)) {
+                            HStack(spacing: 12) {
+                                Circle()
+                                    .fill(Color.churchTalkRed.opacity(0.2))
+                                    .frame(width: 44, height: 44)
+                                    .overlay(
+                                        Text(member.initials)
+                                            .font(.headline)
+                                            .foregroundColor(.churchTalkRed)
+                                    )
 
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(member.fullName)
-                                .font(.body)
-                                .fontWeight(.medium)
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(member.fullName)
+                                        .font(.body)
+                                        .fontWeight(.medium)
 
-                            Text(member.email)
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+                                    Text(member.email)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            .padding(.vertical, 4)
                         }
                     }
-                    .padding(.vertical, 4)
+
+                    // Bottom padding for tab bar
+                    Color.clear.frame(height: 90)
+                        .listRowSeparator(.hidden)
                 }
+                .listStyle(PlainListStyle())
             }
         }
-        .listStyle(PlainListStyle())
+        .task {
+            await loadMembers()
+        }
+        .refreshable {
+            await loadMembers()
+        }
     }
-}
 
-struct SmallGroup: Identifiable {
-    let id: String
-    let name: String
-    let description: String
-    let leaderName: String
-    let meetingDay: String
-    let meetingTime: String
-    let location: String
-    let memberCount: Int
-    let maxMembers: Int
-    let icon: String
-    let category: String
+    private func loadMembers() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let response = try await MembersAPI.shared.getMembers(limit: 100)
+            await MainActor.run {
+                members = response.members
+                isLoading = false
+            }
+        } catch {
+            print("Failed to load members: \(error)")
+            await MainActor.run {
+                errorMessage = "Failed to load members"
+                isLoading = false
+            }
+        }
+    }
 }
 
 struct ConnectGroupsSectionView: View {
     @State private var selectedCategory = "All"
     @State private var showGroupDetail: SmallGroup? = nil
+    @State private var groups: [SmallGroup] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
-    let categories = ["All", "Bible Study", "Fellowship", "Service", "Youth"]
-
-    let groups: [SmallGroup] = [
-        SmallGroup(
-            id: "1",
-            name: "Young Adults",
-            description: "A welcoming community for ages 18-30 to grow in faith, build friendships, and explore life's big questions together.",
-            leaderName: "Pastor Mike Chen",
-            meetingDay: "Friday",
-            meetingTime: "7:00 PM",
-            location: "Fellowship Hall",
-            memberCount: 12,
-            maxMembers: 20,
-            icon: "sparkles",
-            category: "Fellowship"
-        ),
-        SmallGroup(
-            id: "2",
-            name: "Men's Bible Study",
-            description: "Men gathering to study Scripture, encourage one another, and grow as spiritual leaders in their homes and community.",
-            leaderName: "David Anderson",
-            meetingDay: "Saturday",
-            meetingTime: "8:00 AM",
-            location: "Room 201",
-            memberCount: 8,
-            maxMembers: 12,
-            icon: "book.fill",
-            category: "Bible Study"
-        ),
-        SmallGroup(
-            id: "3",
-            name: "Women's Fellowship",
-            description: "Women supporting each other through prayer, Bible study, and meaningful conversations about faith and life.",
-            leaderName: "Sarah Thompson",
-            meetingDay: "Wednesday",
-            meetingTime: "10:00 AM",
-            location: "Prayer Room",
-            memberCount: 15,
-            maxMembers: 18,
-            icon: "heart.fill",
-            category: "Fellowship"
-        ),
-        SmallGroup(
-            id: "4",
-            name: "Marriage Ministry",
-            description: "Couples strengthening their marriages through biblical principles, shared experiences, and community support.",
-            leaderName: "Pastor John & Lisa Smith",
-            meetingDay: "1st Sunday",
-            meetingTime: "4:00 PM",
-            location: "Family Center",
-            memberCount: 20,
-            maxMembers: 30,
-            icon: "person.2.fill",
-            category: "Fellowship"
-        ),
-        SmallGroup(
-            id: "5",
-            name: "Community Outreach",
-            description: "Serving our local community through various outreach projects and showing God's love in action.",
-            leaderName: "Emily Davis",
-            meetingDay: "2nd Saturday",
-            meetingTime: "9:00 AM",
-            location: "Various Locations",
-            memberCount: 18,
-            maxMembers: 25,
-            icon: "hands.sparkles.fill",
-            category: "Service"
-        ),
-        SmallGroup(
-            id: "6",
-            name: "Youth Group",
-            description: "Middle and high school students growing in faith through games, worship, and relevant Bible teaching.",
-            leaderName: "Jake Wilson",
-            meetingDay: "Sunday",
-            meetingTime: "5:30 PM",
-            location: "Youth Center",
-            memberCount: 25,
-            maxMembers: 40,
-            icon: "star.fill",
-            category: "Youth"
-        )
-    ]
+    let categories = ["All", "Small Group", "Life Group", "Bible Study", "Prayer Group", "Ministry Team"]
 
     var filteredGroups: [SmallGroup] {
         if selectedCategory == "All" {
             return groups
         }
-        return groups.filter { $0.category == selectedCategory }
+        // Map category display name to group type
+        let typeFilter: GroupType? = {
+            switch selectedCategory {
+            case "Small Group": return .smallGroup
+            case "Life Group": return .lifeGroup
+            case "Bible Study": return .bibleStudy
+            case "Prayer Group": return .prayerGroup
+            case "Ministry Team": return .ministryTeam
+            default: return nil
+            }
+        }()
+        guard let filter = typeFilter else { return groups }
+        return groups.filter { $0.groupType == filter }
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 16) {
-                // Category Filter
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        ForEach(categories, id: \.self) { category in
-                            Button {
-                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                    selectedCategory = category
-                                }
-                            } label: {
-                                Text(category)
-                                    .font(.subheadline)
-                                    .fontWeight(selectedCategory == category ? .semibold : .regular)
-                                    .padding(.horizontal, 16)
-                                    .padding(.vertical, 8)
-                                    .background(selectedCategory == category ? Color.churchTalkRed : Color(.systemGray6))
-                                    .foregroundColor(selectedCategory == category ? .white : .primary)
-                                    .cornerRadius(20)
-                            }
-                        }
-                    }
-                    .padding(.horizontal)
+        Group {
+            if isLoading {
+                VStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
                 }
-
-                // Groups List
-                LazyVStack(spacing: 12) {
-                    ForEach(filteredGroups) { group in
-                        SmallGroupCard(group: group)
-                            .onTapGesture {
-                                showGroupDetail = group
-                            }
-                    }
-                }
-                .padding(.horizontal)
-
-                // Find a Group CTA
+            } else if let error = errorMessage {
                 VStack(spacing: 12) {
-                    Text("Not sure which group is right for you?")
+                    Spacer()
+                    Image(systemName: "wifi.exclamationmark")
+                        .font(.largeTitle)
+                        .foregroundColor(.orange)
+                    Text(error)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
-
-                    Button {
-                        // Open group finder
-                    } label: {
-                        HStack {
-                            Image(systemName: "questionmark.circle.fill")
-                            Text("Help Me Find a Group")
-                        }
-                        .fontWeight(.semibold)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color.churchTalkRed.opacity(0.1))
-                        .foregroundColor(.churchTalkRed)
-                        .cornerRadius(12)
+                    Button("Retry") {
+                        Task { await loadGroups() }
                     }
+                    .buttonStyle(.bordered)
+                    Spacer()
                 }
-                .padding()
+            } else if groups.isEmpty {
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "person.3")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text("No groups available")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Text("Check back later or ask your church admin to create groups")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
+                    Spacer()
+                }
+            } else {
+                ScrollView {
+                    VStack(spacing: 16) {
+                        // Category Filter
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(categories, id: \.self) { category in
+                                    Button {
+                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                            selectedCategory = category
+                                        }
+                                    } label: {
+                                        Text(category)
+                                            .font(.subheadline)
+                                            .fontWeight(selectedCategory == category ? .semibold : .regular)
+                                            .padding(.horizontal, 16)
+                                            .padding(.vertical, 8)
+                                            .background(selectedCategory == category ? Color.churchTalkRed : Color(.systemGray6))
+                                            .foregroundColor(selectedCategory == category ? .white : .primary)
+                                            .cornerRadius(20)
+                                    }
+                                }
+                            }
+                            .padding(.horizontal)
+                        }
+
+                        // Groups List
+                        LazyVStack(spacing: 12) {
+                            ForEach(filteredGroups) { group in
+                                SmallGroupCard(group: group)
+                                    .onTapGesture {
+                                        showGroupDetail = group
+                                    }
+                            }
+                        }
+                        .padding(.horizontal)
+
+                        // Find a Group CTA
+                        VStack(spacing: 12) {
+                            Text("Not sure which group is right for you?")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+
+                            Button {
+                                // Open group finder
+                            } label: {
+                                HStack {
+                                    Image(systemName: "questionmark.circle.fill")
+                                    Text("Help Me Find a Group")
+                                }
+                                .fontWeight(.semibold)
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                                .background(Color.churchTalkRed.opacity(0.1))
+                                .foregroundColor(.churchTalkRed)
+                                .cornerRadius(12)
+                            }
+                        }
+                        .padding()
+                    }
+                    .padding(.vertical)
+                }
             }
-            .padding(.vertical)
+        }
+        .task {
+            await loadGroups()
+        }
+        .refreshable {
+            await loadGroups()
         }
         .sheet(item: $showGroupDetail) { group in
-            SmallGroupDetailView(group: group)
+            SmallGroupDetailView(group: group, onGroupUpdated: {
+                Task { await loadGroups() }
+            })
+        }
+    }
+
+    private func loadGroups() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let fetchedGroups = try await GroupsAPI.shared.getGroups(isOpen: true)
+            await MainActor.run {
+                groups = fetchedGroups
+                isLoading = false
+            }
+        } catch {
+            print("Failed to load groups: \(error)")
+            await MainActor.run {
+                errorMessage = "Failed to load groups"
+                isLoading = false
+            }
         }
     }
 }
 
 struct SmallGroupCard: View {
     let group: SmallGroup
+
+    private var iconForGroupType: String {
+        switch group.groupType {
+        case .smallGroup: return "person.3.fill"
+        case .lifeGroup: return "heart.fill"
+        case .bibleStudy: return "book.fill"
+        case .prayerGroup: return "hands.sparkles.fill"
+        case .ministryTeam: return "star.fill"
+        case .other: return "circle.grid.2x2.fill"
+        }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -442,7 +589,7 @@ struct SmallGroupCard: View {
                     .fill(Color.churchTalkRed.opacity(0.15))
                     .frame(width: 50, height: 50)
                     .overlay(
-                        Image(systemName: group.icon)
+                        Image(systemName: iconForGroupType)
                             .font(.title3)
                             .foregroundColor(.churchTalkRed)
                     )
@@ -452,37 +599,58 @@ struct SmallGroupCard: View {
                         .font(.headline)
                         .foregroundColor(.primary)
 
-                    Text("Led by \(group.leaderName)")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                    if let leaderName = group.leaderName {
+                        Text("Led by \(leaderName)")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
                 }
 
                 Spacer()
 
                 // Member count indicator
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(group.memberCount)/\(group.maxMembers)")
-                        .font(.caption)
-                        .fontWeight(.semibold)
-                        .foregroundColor(group.memberCount < group.maxMembers ? .green : .orange)
+                if let maxMembers = group.maxMembers {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(group.memberCount)/\(maxMembers)")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(group.memberCount < maxMembers ? .green : .orange)
 
-                    Text("members")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
+                        Text("members")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    VStack(alignment: .trailing, spacing: 2) {
+                        Text("\(group.memberCount)")
+                            .font(.caption)
+                            .fontWeight(.semibold)
+                            .foregroundColor(.green)
+
+                        Text("members")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                 }
             }
 
             // Meeting info
             HStack(spacing: 16) {
-                Label(group.meetingDay, systemImage: "calendar")
-                Label(group.meetingTime, systemImage: "clock")
-                Label(group.location, systemImage: "mappin")
+                if let meetingDay = group.meetingDay {
+                    Label(meetingDay, systemImage: "calendar")
+                }
+                if let meetingTime = group.meetingTime {
+                    Label(meetingTime, systemImage: "clock")
+                }
+                if let location = group.location {
+                    Label(location, systemImage: "mappin")
+                }
             }
             .font(.caption)
             .foregroundColor(.secondary)
 
             // Category tag
-            Text(group.category)
+            Text(group.groupType.displayName)
                 .font(.caption2)
                 .fontWeight(.medium)
                 .padding(.horizontal, 8)
@@ -501,7 +669,28 @@ struct SmallGroupCard: View {
 struct SmallGroupDetailView: View {
     @Environment(\.dismiss) var dismiss
     let group: SmallGroup
+    var onGroupUpdated: (() -> Void)? = nil
     @State private var showJoinConfirmation = false
+    @State private var isJoining = false
+    @State private var joinError: String?
+
+    private var iconForGroupType: String {
+        switch group.groupType {
+        case .smallGroup: return "person.3.fill"
+        case .lifeGroup: return "heart.fill"
+        case .bibleStudy: return "book.fill"
+        case .prayerGroup: return "hands.sparkles.fill"
+        case .ministryTeam: return "star.fill"
+        case .other: return "circle.grid.2x2.fill"
+        }
+    }
+
+    private var isFull: Bool {
+        if let maxMembers = group.maxMembers {
+            return group.memberCount >= maxMembers
+        }
+        return false
+    }
 
     var body: some View {
         NavigationStack {
@@ -513,7 +702,7 @@ struct SmallGroupDetailView: View {
                             .fill(Color.churchTalkRed.opacity(0.15))
                             .frame(width: 80, height: 80)
                             .overlay(
-                                Image(systemName: group.icon)
+                                Image(systemName: iconForGroupType)
                                     .font(.largeTitle)
                                     .foregroundColor(.churchTalkRed)
                             )
@@ -522,7 +711,7 @@ struct SmallGroupDetailView: View {
                             .font(.title)
                             .fontWeight(.bold)
 
-                        Text(group.category)
+                        Text(group.groupType.displayName)
                             .font(.subheadline)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
@@ -533,51 +722,77 @@ struct SmallGroupDetailView: View {
                     .padding(.top)
 
                     // Description
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("About")
-                            .font(.headline)
+                    if let description = group.description {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("About")
+                                .font(.headline)
 
-                        Text(group.description)
-                            .font(.body)
-                            .foregroundColor(.secondary)
+                            Text(description)
+                                .font(.body)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.horizontal)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
 
                     // Details
                     VStack(spacing: 16) {
-                        DetailRow(icon: "person.fill", title: "Leader", value: group.leaderName)
-                        DetailRow(icon: "calendar", title: "Meets", value: "\(group.meetingDay)s at \(group.meetingTime)")
-                        DetailRow(icon: "mappin.and.ellipse", title: "Location", value: group.location)
-                        DetailRow(icon: "person.3.fill", title: "Members", value: "\(group.memberCount) of \(group.maxMembers)")
+                        if let leaderName = group.leaderName {
+                            DetailRow(icon: "person.fill", title: "Leader", value: leaderName)
+                        }
+                        DetailRow(icon: "calendar", title: "Meets", value: group.meetingSchedule)
+                        if let location = group.location {
+                            DetailRow(icon: "mappin.and.ellipse", title: "Location", value: location)
+                        }
+                        if let maxMembers = group.maxMembers {
+                            DetailRow(icon: "person.3.fill", title: "Members", value: "\(group.memberCount) of \(maxMembers)")
+                        } else {
+                            DetailRow(icon: "person.3.fill", title: "Members", value: "\(group.memberCount)")
+                        }
                     }
                     .padding()
                     .background(Color(.systemGray6))
                     .cornerRadius(16)
                     .padding(.horizontal)
 
+                    // Error message
+                    if let error = joinError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .padding(.horizontal)
+                    }
+
                     // Join Button
-                    if group.memberCount < group.maxMembers {
+                    if group.isOpen && !isFull {
                         Button {
                             showJoinConfirmation = true
                         } label: {
-                            Text("Join This Group")
-                                .fontWeight(.semibold)
-                                .frame(maxWidth: .infinity)
-                                .padding()
-                                .background(Color.churchTalkRed)
-                                .foregroundColor(.white)
-                                .cornerRadius(12)
+                            HStack {
+                                if isJoining {
+                                    ProgressView()
+                                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                                } else {
+                                    Text("Join This Group")
+                                }
+                            }
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color.churchTalkRed)
+                            .foregroundColor(.white)
+                            .cornerRadius(12)
                         }
+                        .disabled(isJoining)
                         .padding(.horizontal)
-                    } else {
+                    } else if isFull {
                         VStack(spacing: 8) {
                             Text("This group is currently full")
                                 .font(.subheadline)
                                 .foregroundColor(.secondary)
 
                             Button {
-                                // Join waitlist
+                                // Join waitlist - not implemented yet
                             } label: {
                                 Text("Join Waitlist")
                                     .fontWeight(.semibold)
@@ -589,25 +804,33 @@ struct SmallGroupDetailView: View {
                             }
                         }
                         .padding(.horizontal)
+                    } else if !group.isOpen {
+                        Text("This group is not accepting new members")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                            .padding(.horizontal)
                     }
 
                     // Contact Leader
-                    Button {
-                        // Contact group leader
-                    } label: {
-                        HStack {
-                            Image(systemName: "envelope.fill")
-                            Text("Contact Leader")
+                    if group.leaderName != nil {
+                        Button {
+                            // Contact group leader - not implemented yet
+                        } label: {
+                            HStack {
+                                Image(systemName: "envelope.fill")
+                                Text("Contact Leader")
+                            }
+                            .fontWeight(.medium)
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(Color(.systemGray6))
+                            .foregroundColor(.primary)
+                            .cornerRadius(12)
                         }
-                        .fontWeight(.medium)
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(.systemGray6))
-                        .foregroundColor(.primary)
-                        .cornerRadius(12)
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
-                    .padding(.bottom)
+
+                    Spacer().frame(height: 20)
                 }
             }
             .navigationTitle("Group Details")
@@ -620,13 +843,34 @@ struct SmallGroupDetailView: View {
             .alert("Join Group?", isPresented: $showJoinConfirmation) {
                 Button("Cancel", role: .cancel) { }
                 Button("Join") {
-                    // Join the group
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.success)
-                    dismiss()
+                    joinGroup()
                 }
             } message: {
                 Text("You'll be added to \(group.name) and receive updates about meetings.")
+            }
+        }
+    }
+
+    private func joinGroup() {
+        isJoining = true
+        joinError = nil
+
+        Task {
+            do {
+                _ = try await GroupsAPI.shared.joinGroup(id: group.id)
+                await MainActor.run {
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                    isJoining = false
+                    onGroupUpdated?()
+                    dismiss()
+                }
+            } catch {
+                print("Failed to join group: \(error)")
+                await MainActor.run {
+                    joinError = "Failed to join group. Please try again."
+                    isJoining = false
+                }
             }
         }
     }

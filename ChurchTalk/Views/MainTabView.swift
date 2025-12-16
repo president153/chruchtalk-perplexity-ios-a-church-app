@@ -25,7 +25,23 @@ struct MainTabView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .safeAreaInset(edge: .bottom) {
-            FloatingTabBar(selectedTab: $selectedTab)
+            VStack(spacing: 0) {
+                FloatingTabBar(selectedTab: $selectedTab)
+            }
+            .frame(maxWidth: .infinity)
+            .background(
+                // Subtle gradient blur to prevent content showing through gaps
+                LinearGradient(
+                    colors: [
+                        Color(.systemBackground).opacity(0),
+                        Color(.systemBackground).opacity(0.8),
+                        Color(.systemBackground)
+                    ],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+                .ignoresSafeArea(edges: .bottom)
+            )
         }
         .ignoresSafeArea(.keyboard)
     }
@@ -58,15 +74,15 @@ struct FloatingTabBar: View {
                 }
             }
         }
-        .padding(.horizontal, 6)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 28)
+            RoundedRectangle(cornerRadius: 22)
                 .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.15), radius: 12, y: 4)
+                .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
         )
-        .padding(.horizontal, 20)
-        .padding(.bottom, 16)
+        .padding(.horizontal, 24)
+        .padding(.bottom, 12)
     }
 }
 

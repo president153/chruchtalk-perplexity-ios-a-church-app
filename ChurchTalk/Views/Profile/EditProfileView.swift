@@ -1,5 +1,7 @@
 import SwiftUI
 import PhotosUI
+import MapKit
+import CoreLocation
 
 struct EditProfileView: View {
     @Environment(\.dismiss) private var dismiss
@@ -19,9 +21,17 @@ struct EditProfileView: View {
     @State private var state = ""
     @State private var zipCode = ""
 
+    // Map
+    @State private var mapRegion = MKCoordinateRegion(
+        center: CLLocationCoordinate2D(latitude: 37.7749, longitude: -122.4194),
+        span: MKCoordinateSpan(latitudeDelta: 0.01, longitudeDelta: 0.01)
+    )
+    @State private var addressCoordinate: CLLocationCoordinate2D?
+
     // Photo picker
     @State private var selectedPhoto: PhotosPickerItem?
     @State private var profileImage: Image?
+    @State private var selectedImageData: Data?
 
     // Navigation
     @State private var showSpiritualJourney = false
@@ -77,6 +87,7 @@ struct EditProfileView: View {
                                     if let data = try? await newValue?.loadTransferable(type: Data.self),
                                        let uiImage = UIImage(data: data) {
                                         profileImage = Image(uiImage: uiImage)
+                                        selectedImageData = data
                                     }
                                 }
                             }
@@ -176,6 +187,30 @@ struct EditProfileView: View {
                             TextField("12345", text: $zipCode)
                                 .multilineTextAlignment(.trailing)
                                 .keyboardType(.numberPad)
+                        }
+
+                        // Map Preview (like Apple Contacts)
+                        if addressCoordinate != nil {
+                            Map(coordinateRegion: $mapRegion, annotationItems: [AddressAnnotation(coordinate: addressCoordinate!)]) { item in
+                                MapMarker(coordinate: item.coordinate, tint: .churchTalkRed)
+                            }
+                            .frame(height: 150)
+                            .cornerRadius(12)
+                            .allowsHitTesting(false)
+                        }
+
+                        // Geocode button
+                        if !street.isEmpty && !city.isEmpty && !state.isEmpty {
+                            Button {
+                                geocodeAddress()
+                            } label: {
+                                HStack {
+                                    Image(systemName: "location.magnifyingglass")
+                                    Text(addressCoordinate == nil ? "Show on Map" : "Update Map")
+                                }
+                                .font(.subheadline)
+                                .foregroundColor(.churchTalkRed)
+                            }
                         }
                     }
 
@@ -295,15 +330,53 @@ struct EditProfileView: View {
         lastName = member.lastName
         email = member.email
         phone = member.phone ?? ""
-        // Address would come from member.address if available
+
+        // Load date of birth if available
+        if let dob = member.dateOfBirth {
+            dateOfBirth = dob
+        }
+
+        // Load address if available
+        if let address = member.address {
+            street = address.street
+            city = address.city
+            state = address.state
+            zipCode = address.zipCode
+            // Auto-geocode if address exists
+            geocodeAddress()
+        }
+
+        // Load profile image if available
+        if let photoUrl = member.profilePhotoUrl, let url = URL(string: photoUrl) {
+            Task {
+                if let (data, _) = try? await URLSession.shared.data(from: url),
+                   let uiImage = UIImage(data: data) {
+                    await MainActor.run {
+                        profileImage = Image(uiImage: uiImage)
+                    }
+                }
+            }
+        }
     }
 
     private func hasChanges() -> Bool {
         guard let member = authViewModel.currentMember else { return false }
 
-        return firstName != member.firstName ||
-               lastName != member.lastName ||
-               phone != (member.phone ?? "")
+        let nameChanged = firstName != member.firstName ||
+                          lastName != member.lastName ||
+                          phone != (member.phone ?? "")
+
+        // Check address changes
+        let currentAddress = member.address
+        let addressChanged = street != (currentAddress?.street ?? "") ||
+                             city != (currentAddress?.city ?? "") ||
+                             state != (currentAddress?.state ?? "") ||
+                             zipCode != (currentAddress?.zipCode ?? "")
+
+        // Check if image was selected
+        let imageChanged = selectedImageData != nil
+
+        return nameChanged || addressChanged || imageChanged
     }
 
     private func calculateAge() -> Int {
@@ -319,11 +392,40 @@ struct EditProfileView: View {
 
         Task {
             do {
+                // Upload profile image if one was selected
+                var profileImageUrl: String? = nil
+                if let imageData = selectedImageData,
+                   let uiImage = UIImage(data: imageData) {
+                    profileImageUrl = try await UploadsAPI.shared.uploadImage(
+                        uiImage,
+                        uploadType: .profilePhoto
+                    )
+                }
+
+                // Build address if any field is filled
+                var addressRequest: AddressUpdateRequest? = nil
+                if !street.isEmpty || !city.isEmpty || !state.isEmpty || !zipCode.isEmpty {
+                    addressRequest = AddressUpdateRequest(
+                        street: street.isEmpty ? nil : street,
+                        city: city.isEmpty ? nil : city,
+                        state: state.isEmpty ? nil : state,
+                        zipCode: zipCode.isEmpty ? nil : zipCode
+                    )
+                }
+
+                // Format date of birth as ISO8601 with time (backend expects datetime)
+                let dateFormatter = ISO8601DateFormatter()
+                dateFormatter.formatOptions = [.withInternetDateTime]
+                let dateOfBirthString = dateFormatter.string(from: dateOfBirth)
+
                 let request = MemberUpdateRequest(
                     firstName: firstName,
                     lastName: lastName,
                     phone: phone.isEmpty ? nil : phone,
-                    ministries: nil
+                    profilePhotoUrl: profileImageUrl,
+                    dateOfBirth: dateOfBirthString,
+                    ministries: nil,
+                    address: addressRequest
                 )
 
                 let updatedMember = try await MembersAPI.shared.updateMember(id: memberId, request: request)
@@ -352,6 +454,31 @@ struct EditProfileView: View {
             }
         }
     }
+
+    private func geocodeAddress() {
+        let addressString = "\(street), \(city), \(state) \(zipCode)"
+        let geocoder = CLGeocoder()
+
+        geocoder.geocodeAddressString(addressString) { placemarks, error in
+            if let placemark = placemarks?.first,
+               let location = placemark.location {
+                DispatchQueue.main.async {
+                    self.addressCoordinate = location.coordinate
+                    self.mapRegion = MKCoordinateRegion(
+                        center: location.coordinate,
+                        span: MKCoordinateSpan(latitudeDelta: 0.005, longitudeDelta: 0.005)
+                    )
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Supporting Types
+
+struct AddressAnnotation: Identifiable {
+    let id = UUID()
+    let coordinate: CLLocationCoordinate2D
 }
 
 struct MilestoneRow: View {
@@ -405,7 +532,9 @@ struct DateOfBirthPicker: View {
 
                 Spacer()
 
-                Button(action: { dismiss() }) {
+                Button {
+                    dismiss()
+                } label: {
                     Text("Done")
                         .font(.headline)
                         .foregroundColor(.white)
@@ -414,8 +543,9 @@ struct DateOfBirthPicker: View {
                         .background(Color.churchTalkRed)
                         .cornerRadius(ChurchTalkTheme.cornerRadius)
                 }
+                .buttonStyle(.plain)
                 .padding(.horizontal)
-                .padding(.bottom, 20)
+                .padding(.bottom, 40)
             }
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {

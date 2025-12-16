@@ -2,6 +2,7 @@ import SwiftUI
 
 struct DoorKnockingView: View {
     let door: OutreachDoor
+    var onDoorUpdated: (() -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
 
     @State private var selectedStatus: DoorStatus = .notVisited
@@ -9,6 +10,8 @@ struct DoorKnockingView: View {
     @State private var phone = ""
     @State private var notes = ""
     @State private var showAddToSRM = false
+    @State private var isSaving = false
+    @State private var saveError: String?
 
     var body: some View {
         NavigationStack {
@@ -43,10 +46,12 @@ struct DoorKnockingView: View {
                             OutcomeButton(status: .followUp, isSelected: selectedStatus == .followUp) {
                                 selectedStatus = .followUp
                             }
-                        }
-
-                        OutcomeButton(status: .doNotContact, isSelected: selectedStatus == .doNotContact) {
-                            selectedStatus = .doNotContact
+                            OutcomeButton(status: .alreadyMember, isSelected: selectedStatus == .alreadyMember) {
+                                selectedStatus = .alreadyMember
+                            }
+                            OutcomeButton(status: .doNotContact, isSelected: selectedStatus == .doNotContact) {
+                                selectedStatus = .doNotContact
+                            }
                         }
                     }
                     .padding(.horizontal)
@@ -84,6 +89,14 @@ struct DoorKnockingView: View {
                         .padding(.horizontal)
                     }
 
+                    // Error message
+                    if let error = saveError {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                            .padding(.horizontal)
+                    }
+
                     Spacer(minLength: 32)
                 }
             }
@@ -92,25 +105,53 @@ struct DoorKnockingView: View {
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") { dismiss() }
+                        .disabled(isSaving)
                 }
 
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") {
+                    Button {
                         saveVisit()
+                    } label: {
+                        if isSaving {
+                            ProgressView()
+                        } else {
+                            Text("Save")
+                                .fontWeight(.semibold)
+                        }
                     }
-                    .disabled(selectedStatus == .notVisited)
-                    .fontWeight(.semibold)
+                    .disabled(selectedStatus == .notVisited || isSaving)
                 }
             }
         }
     }
 
     private func saveVisit() {
-        // TODO: Save to backend
-        if selectedStatus == .interested && !residentName.isEmpty {
-            showAddToSRM = true
-        } else {
-            dismiss()
+        isSaving = true
+        saveError = nil
+
+        Task {
+            do {
+                _ = try await OutreachAPI.shared.updateDoor(
+                    id: door.id,
+                    status: selectedStatus,
+                    residentName: residentName.isEmpty ? nil : residentName,
+                    notes: notes.isEmpty ? nil : notes
+                )
+
+                await MainActor.run {
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                    isSaving = false
+                    onDoorUpdated?()
+                    dismiss()
+                }
+            } catch {
+                print("Failed to save visit: \(error)")
+                await MainActor.run {
+                    saveError = "Failed to save. Please try again."
+                    isSaving = false
+                }
+            }
         }
     }
 }
@@ -128,6 +169,7 @@ struct OutcomeButton: View {
         case .notInterested: return .red
         case .followUp: return .purple
         case .doNotContact: return .black
+        case .alreadyMember: return .blue
         }
     }
 
@@ -139,6 +181,7 @@ struct OutcomeButton: View {
         case .notInterested: return "xmark.circle.fill"
         case .followUp: return "arrow.clockwise.circle.fill"
         case .doNotContact: return "hand.raised.fill"
+        case .alreadyMember: return "person.crop.circle.badge.checkmark"
         }
     }
 
@@ -163,6 +206,4 @@ struct OutcomeButton: View {
     }
 }
 
-#Preview {
-    DoorKnockingView(door: OutreachDoor(id: "1", houseNumber: "3044", fullAddress: "3044 E Lingard St", status: .notVisited))
-}
+// Preview disabled - OutreachDoor requires API response format

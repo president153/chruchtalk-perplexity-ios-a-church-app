@@ -28,12 +28,23 @@ struct MessageResponse: Codable {
 
 // MARK: - Request Types
 
+/// Address update request
+struct AddressUpdateRequest: Codable {
+    var street: String?
+    var city: String?
+    var state: String?
+    var zipCode: String?
+}
+
 /// Request body for updating a member
 struct MemberUpdateRequest: Codable {
     var firstName: String?
     var lastName: String?
     var phone: String?
+    var profilePhotoUrl: String?
+    var dateOfBirth: String?  // ISO8601 date string
     var ministries: [String]?
+    var address: AddressUpdateRequest?
 }
 
 /// Request body for updating member role
@@ -98,6 +109,14 @@ class MembersAPI {
         limit: Int = 50
     ) async throws -> PendingApprovalsResponse {
         return try await client.get("/members/pending?skip=\(skip)&limit=\(limit)")
+    }
+
+    // MARK: - Get Current Member
+
+    /// Get the current authenticated member's profile
+    /// - Returns: Current member with full profile data
+    func getCurrentMember() async throws -> Member {
+        return try await client.get("/members/me")
     }
 
     // MARK: - Get Member

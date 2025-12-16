@@ -3,6 +3,7 @@ import SwiftUI
 struct BulletinDetailView: View {
     let post: BulletinPost
     let viewSource: ViewSource
+    @EnvironmentObject var authViewModel: AuthViewModel
     @State private var comments: [Comment] = []
     @State private var newCommentText = ""
     @FocusState private var isCommentFieldFocused: Bool
@@ -21,6 +22,15 @@ struct BulletinDetailView: View {
     // View tracking
     @State private var viewTracker: PostViewTracker?
     @State private var viewStartTime: Date?
+
+    // Auth helpers
+    var isAdmin: Bool {
+        authViewModel.currentMember?.isAdmin == true
+    }
+
+    var currentUserId: String? {
+        authViewModel.currentMember?.id
+    }
 
     init(post: BulletinPost, source: ViewSource = .feed) {
         self.post = post
@@ -50,9 +60,17 @@ struct BulletinDetailView: View {
                         comments: comments,
                         isLoading: isLoadingComments,
                         errorMessage: errorMessage,
+                        isAdmin: isAdmin,
+                        currentUserId: currentUserId,
                         onReply: { comment in
                             replyingTo = comment
                             isCommentFieldFocused = true
+                        },
+                        onDelete: { comment in
+                            deleteComment(comment)
+                        },
+                        onRetry: {
+                            Task { await loadComments() }
                         }
                     )
                 }
@@ -71,6 +89,7 @@ struct BulletinDetailView: View {
                 onCancelReply: { replyingTo = nil },
                 onSubmit: submitComment
             )
+            .padding(.bottom, 90) // Account for floating tab bar
         }
         .navigationTitle("Post")
         .navigationBarTitleDisplayMode(.inline)
@@ -112,8 +131,13 @@ struct BulletinDetailView: View {
                 isLoadingComments = false
             }
         } catch {
+            print("Failed to load comments: \(error)")
             await MainActor.run {
-                errorMessage = "Failed to load comments"
+                if let apiError = error as? APIError {
+                    errorMessage = apiError.errorDescription ?? "Failed to load comments"
+                } else {
+                    errorMessage = "Failed to load comments"
+                }
                 isLoadingComments = false
             }
         }
@@ -168,76 +192,99 @@ struct BulletinDetailView: View {
         }
     }
 
-    private func toggleReaction(_ type: ReactionType) {
-        print("🔵 DetailView toggleReaction called with type: \(type)")
-        guard !isTogglingReaction else {
-            print("⚠️ toggleReaction blocked - already toggling")
-            return
-        }
+    private func deleteComment(_ comment: Comment) {
+        Task {
+            do {
+                try await BulletinAPI.shared.deleteComment(postId: post.id, commentId: comment.id)
+                await MainActor.run {
+                    // Remove from local state
+                    if let index = comments.firstIndex(where: { $0.id == comment.id }) {
+                        _ = withAnimation {
+                            comments.remove(at: index)
+                        }
+                    } else {
+                        // Check if it's a reply
+                        for i in comments.indices {
+                            if let replyIndex = comments[i].replies.firstIndex(where: { $0.id == comment.id }) {
+                                _ = withAnimation {
+                                    comments[i].replies.remove(at: replyIndex)
+                                }
+                                break
+                            }
+                        }
+                    }
 
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                }
+            } catch {
+                await MainActor.run {
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
+            }
+        }
+    }
+
+    private func toggleReaction(_ type: ReactionType) {
+        guard !isTogglingReaction else { return }
         isTogglingReaction = true
 
-        // Optimistic update
+        // Optimistic update - no withAnimation to avoid AttributeGraph cycle
         let previousReaction = userReaction
         let previousReactions = currentReactions
 
-        withAnimation(ChurchTalkAnimations.bouncy) {
-            if userReaction == type {
-                userReaction = nil
-                // Decrement reaction count
-                switch type {
+        if userReaction == type {
+            // Removing reaction
+            userReaction = nil
+            switch type {
+            case .like: currentReactions = Reactions(like: max(0, currentReactions.like - 1), pray: currentReactions.pray, amen: currentReactions.amen)
+            case .pray: currentReactions = Reactions(like: currentReactions.like, pray: max(0, currentReactions.pray - 1), amen: currentReactions.amen)
+            case .amen: currentReactions = Reactions(like: currentReactions.like, pray: currentReactions.pray, amen: max(0, currentReactions.amen - 1))
+            }
+        } else {
+            // Remove previous reaction if switching
+            if let prev = userReaction {
+                switch prev {
                 case .like: currentReactions = Reactions(like: max(0, currentReactions.like - 1), pray: currentReactions.pray, amen: currentReactions.amen)
                 case .pray: currentReactions = Reactions(like: currentReactions.like, pray: max(0, currentReactions.pray - 1), amen: currentReactions.amen)
                 case .amen: currentReactions = Reactions(like: currentReactions.like, pray: currentReactions.pray, amen: max(0, currentReactions.amen - 1))
                 }
-            } else {
-                // Remove previous reaction if exists
-                if let prev = userReaction {
-                    switch prev {
-                    case .like: currentReactions = Reactions(like: max(0, currentReactions.like - 1), pray: currentReactions.pray, amen: currentReactions.amen)
-                    case .pray: currentReactions = Reactions(like: currentReactions.like, pray: max(0, currentReactions.pray - 1), amen: currentReactions.amen)
-                    case .amen: currentReactions = Reactions(like: currentReactions.like, pray: currentReactions.pray, amen: max(0, currentReactions.amen - 1))
-                    }
-                }
-
-                userReaction = type
-                // Increment new reaction count
-                switch type {
-                case .like: currentReactions = Reactions(like: currentReactions.like + 1, pray: currentReactions.pray, amen: currentReactions.amen)
-                case .pray: currentReactions = Reactions(like: currentReactions.like, pray: currentReactions.pray + 1, amen: currentReactions.amen)
-                case .amen: currentReactions = Reactions(like: currentReactions.like, pray: currentReactions.pray, amen: currentReactions.amen + 1)
-                }
+            }
+            // Add new reaction
+            userReaction = type
+            switch type {
+            case .like: currentReactions = Reactions(like: currentReactions.like + 1, pray: currentReactions.pray, amen: currentReactions.amen)
+            case .pray: currentReactions = Reactions(like: currentReactions.like, pray: currentReactions.pray + 1, amen: currentReactions.amen)
+            case .amen: currentReactions = Reactions(like: currentReactions.like, pray: currentReactions.pray, amen: currentReactions.amen + 1)
             }
         }
 
-        // Haptic feedback
-        let generator = UIImpactFeedbackGenerator(style: .light)
+        // Haptic
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.prepare()
         generator.impactOccurred()
 
         Task {
             do {
                 let response = try await BulletinAPI.shared.toggleReaction(postId: post.id, reactionType: type)
-                print("🟢 DetailView reaction toggle success: \(response)")
-
                 await MainActor.run {
-                    // Update with server response
+                    // Sync with server - use `added` to determine user's reaction state
                     currentReactions = Reactions(
                         like: response.reactions.like,
                         pray: response.reactions.pray,
                         amen: response.reactions.amen
                     )
+                    // If server says reaction was added, user has this reaction; if removed, user has none
+                    userReaction = response.added ? type : nil
                     isTogglingReaction = false
                 }
             } catch {
-                print("❌ DetailView reaction toggle failed: \(error)")
                 await MainActor.run {
-                    // Revert optimistic update on error
+                    // Revert on error
                     userReaction = previousReaction
                     currentReactions = previousReactions
                     isTogglingReaction = false
-
-                    let generator = UINotificationFeedbackGenerator()
-                    generator.notificationOccurred(.error)
                 }
             }
         }
@@ -310,13 +357,12 @@ struct BulletinPostContent: View {
 
             Divider()
 
-            // Reactions Bar
+            // Reactions Bar - No loading spinners, just instant optimistic updates
             HStack(spacing: 24) {
                 DetailReactionButton(
                     type: .like,
                     count: currentReactions.like,
                     isSelected: userReaction == .like,
-                    isLoading: isTogglingReaction && userReaction == .like,
                     action: { onReactionToggle(.like) }
                 )
 
@@ -324,7 +370,6 @@ struct BulletinPostContent: View {
                     type: .pray,
                     count: currentReactions.pray,
                     isSelected: userReaction == .pray,
-                    isLoading: isTogglingReaction && userReaction == .pray,
                     action: { onReactionToggle(.pray) }
                 )
 
@@ -332,7 +377,6 @@ struct BulletinPostContent: View {
                     type: .amen,
                     count: currentReactions.amen,
                     isSelected: userReaction == .amen,
-                    isLoading: isTogglingReaction && userReaction == .amen,
                     action: { onReactionToggle(.amen) }
                 )
 
@@ -416,14 +460,13 @@ struct DetailReactionButton: View {
     let type: ReactionType
     let count: Int
     let isSelected: Bool
-    var isLoading: Bool = false
     let action: () -> Void
 
-    var icon: String {
+    var emoji: String {
         switch type {
-        case .like: return isSelected ? "heart.fill" : "heart"
-        case .pray: return "hands.sparkles.fill"
-        case .amen: return isSelected ? "checkmark.circle.fill" : "checkmark.circle"
+        case .like: return "❤️"
+        case .pray: return "🙏"
+        case .amen: return "🙌"
         }
     }
 
@@ -431,47 +474,47 @@ struct DetailReactionButton: View {
         switch type {
         case .like: return .heartRed
         case .pray: return .churchTalkRed
-        case .amen: return .amenGreen
-        }
-    }
-
-    var label: String {
-        switch type {
-        case .like: return "Like"
-        case .pray: return "Pray"
-        case .amen: return "Amen"
+        case .amen: return .orange
         }
     }
 
     var body: some View {
-        Button(action: {
-            let generator = UIImpactFeedbackGenerator(style: .light)
+        Button {
+            // Haptic feedback
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.prepare()
             generator.impactOccurred()
-            print("🔴 DetailReactionButton tapped: \(type)")
             action()
-        }) {
-            VStack(spacing: 4) {
-                if isLoading {
-                    ProgressView()
-                        .scaleEffect(0.7)
-                        .frame(height: 24)
-                } else {
-                    Image(systemName: icon)
-                        .font(.title3)
-                        .foregroundColor(isSelected ? color : .secondary)
-                        .scaleEffect(isSelected ? 1.1 : 1.0)
-                }
+        } label: {
+            VStack(spacing: 6) {
+                Text(emoji)
+                    .font(.system(size: 24))
+                    .scaleEffect(isSelected ? 1.2 : 1.0)
 
                 Text("\(count)")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundColor(isSelected ? color : .secondary)
             }
-            .frame(minWidth: 50)
-            .padding(.vertical, 8)
+            .frame(minWidth: 60)
+            .padding(.vertical, 12)
+            .padding(.horizontal, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isSelected ? color.opacity(0.1) : Color.clear)
+            )
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        .disabled(isLoading)
+        .buttonStyle(DetailReactionButtonStyle())
+        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isSelected)
+    }
+}
+
+// Custom button style for detail reaction buttons
+struct DetailReactionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 
@@ -479,7 +522,11 @@ struct CommentsSection: View {
     let comments: [Comment]
     let isLoading: Bool
     let errorMessage: String?
+    var isAdmin: Bool = false
+    var currentUserId: String? = nil
     var onReply: ((Comment) -> Void)? = nil
+    var onDelete: ((Comment) -> Void)? = nil
+    var onRetry: (() -> Void)? = nil
 
     var body: some View {
         LazyVStack(alignment: .leading, spacing: 16) {
@@ -494,13 +541,20 @@ struct CommentsSection: View {
                     Spacer()
                 }
             } else if let error = errorMessage {
-                VStack(spacing: 8) {
+                VStack(spacing: 12) {
                     Image(systemName: "exclamationmark.triangle")
                         .font(.largeTitle)
                         .foregroundColor(.orange)
                     Text(error)
                         .font(.subheadline)
                         .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                    if let onRetry = onRetry {
+                        Button("Retry") {
+                            onRetry()
+                        }
+                        .buttonStyle(.bordered)
+                    }
                 }
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 20)
@@ -511,8 +565,14 @@ struct CommentsSection: View {
                     .padding(.vertical, 20)
             } else {
                 ForEach(comments) { comment in
-                    CommentCard(comment: comment, onReply: onReply)
-                        .transition(ChurchTalkAnimations.slideUp)
+                    CommentCard(
+                        comment: comment,
+                        onReply: onReply,
+                        onDelete: onDelete,
+                        isAdmin: isAdmin,
+                        currentUserId: currentUserId
+                    )
+                    .transition(ChurchTalkAnimations.slideUp)
                 }
             }
         }
@@ -522,7 +582,15 @@ struct CommentsSection: View {
 struct CommentCard: View {
     let comment: Comment
     var onReply: ((Comment) -> Void)? = nil
+    var onDelete: ((Comment) -> Void)? = nil
+    var isAdmin: Bool = false
+    var currentUserId: String? = nil
     var isReply: Bool = false
+
+    var isOwnComment: Bool {
+        guard let userId = currentUserId else { return false }
+        return comment.author.id == userId
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -552,18 +620,27 @@ struct CommentCard: View {
                         .font(.body)
                         .fixedSize(horizontal: false, vertical: true)
 
-                    // Reply button (only for top-level comments)
-                    if !isReply, let onReply = onReply {
-                        Button(action: { onReply(comment) }) {
-                            HStack(spacing: 4) {
+                    // Action buttons
+                    HStack(spacing: 16) {
+                        // Reply button - ONLY for admins on top-level comments
+                        if !isReply && isAdmin, let onReply = onReply {
+                            Button(action: { onReply(comment) }) {
                                 Image(systemName: "arrowshape.turn.up.left")
-                                Text("Reply")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
                             }
-                            .font(.caption)
-                            .foregroundColor(.secondary)
                         }
-                        .padding(.top, 4)
+
+                        // Delete button - for own comments OR admins
+                        if (isOwnComment || isAdmin), let onDelete = onDelete {
+                            Button(action: { onDelete(comment) }) {
+                                Image(systemName: "trash")
+                                    .font(.subheadline)
+                                    .foregroundColor(.red)
+                            }
+                        }
                     }
+                    .padding(.top, 4)
                 }
 
                 Spacer()
@@ -575,8 +652,14 @@ struct CommentCard: View {
             // Show nested replies
             if !comment.replies.isEmpty {
                 ForEach(comment.replies) { reply in
-                    CommentCard(comment: reply, isReply: true)
-                        .padding(.leading, 32)
+                    CommentCard(
+                        comment: reply,
+                        onDelete: onDelete,
+                        isAdmin: isAdmin,
+                        currentUserId: currentUserId,
+                        isReply: true
+                    )
+                    .padding(.leading, 32)
                 }
             }
         }

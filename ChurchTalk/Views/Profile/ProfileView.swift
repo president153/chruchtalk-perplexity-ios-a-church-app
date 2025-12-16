@@ -15,12 +15,11 @@ struct ProfileView: View {
     @State private var showMySouls = false
     @State private var showChurchEditor = false
 
-    // Demo stats
-    let stats = [
-        ("door.left.hand.closed", "127", "Doors Knocked"),
-        ("star.fill", "18", "Souls Added"),
-        ("hands.sparkles.fill", "45", "Prayers"),
-    ]
+    // Stats from API
+    @State private var doorsKnocked: Int = 0
+    @State private var soulsAdded: Int = 0
+    @State private var prayersCount: Int = 0
+    @State private var isLoadingStats = true
 
     var body: some View {
         NavigationStack {
@@ -28,14 +27,28 @@ struct ProfileView: View {
                 VStack(spacing: 24) {
                     // Profile Header
                     VStack(spacing: 16) {
-                        Circle()
-                            .fill(Color.churchTalkRed.opacity(0.2))
-                            .frame(width: 80, height: 80)
-                            .overlay(
-                                Text(authViewModel.currentMember?.initials ?? "CT")
-                                    .font(.title)
-                                    .foregroundColor(.churchTalkRed)
-                            )
+                        if let photoUrl = authViewModel.currentMember?.profilePhotoUrl,
+                           let url = URL(string: photoUrl) {
+                            AsyncImage(url: url) { phase in
+                                switch phase {
+                                case .success(let image):
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                        .frame(width: 80, height: 80)
+                                        .clipShape(Circle())
+                                case .failure(_):
+                                    profileInitialsView
+                                case .empty:
+                                    ProgressView()
+                                        .frame(width: 80, height: 80)
+                                @unknown default:
+                                    profileInitialsView
+                                }
+                            }
+                        } else {
+                            profileInitialsView
+                        }
 
                         VStack(spacing: 4) {
                             Text(authViewModel.currentMember?.fullName ?? "Church Member")
@@ -81,20 +94,9 @@ struct ProfileView: View {
 
                     // Stats
                     HStack(spacing: 0) {
-                        ForEach(stats, id: \.0) { stat in
-                            VStack(spacing: 8) {
-                                Image(systemName: stat.0)
-                                    .font(.title2)
-                                    .foregroundColor(.churchTalkRed)
-                                Text(stat.1)
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                                Text(stat.2)
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                            .frame(maxWidth: .infinity)
-                        }
+                        ProfileStatBox(icon: "door.left.hand.closed", value: doorsKnocked, label: "Doors Knocked", isLoading: isLoadingStats)
+                        ProfileStatBox(icon: "star.fill", value: soulsAdded, label: "Souls Added", isLoading: isLoadingStats)
+                        ProfileStatBox(icon: "hands.sparkles.fill", value: prayersCount, label: "Prayers", isLoading: isLoadingStats)
                     }
                     .padding()
                     .background(Color(.systemGray6))
@@ -193,7 +195,79 @@ struct ProfileView: View {
                 ChurchProfileEditorView()
                     .environmentObject(authViewModel)
             }
+            .task {
+                await loadStats()
+            }
         }
+    }
+
+    private var profileInitialsView: some View {
+        Circle()
+            .fill(Color.churchTalkRed.opacity(0.2))
+            .frame(width: 80, height: 80)
+            .overlay(
+                Text(authViewModel.currentMember?.initials ?? "CT")
+                    .font(.title)
+                    .foregroundColor(.churchTalkRed)
+            )
+    }
+
+    private func loadStats() async {
+        isLoadingStats = true
+
+        // Load souls count
+        do {
+            let souls = try await SoulsAPI.shared.getSouls(mine: true, limit: 1000)
+            await MainActor.run {
+                soulsAdded = souls.count
+            }
+        } catch {
+            print("Failed to load souls count: \(error)")
+        }
+
+        // Load prayers count (prayers user has made)
+        do {
+            let prayers = try await PrayerAPI.shared.getMyPrayers()
+            await MainActor.run {
+                prayersCount = prayers.count
+            }
+        } catch {
+            print("Failed to load prayers count: \(error)")
+        }
+
+        // Doors knocked would come from outreach API (not available yet)
+        // For now, keep as 0 or could calculate from local data if available
+
+        await MainActor.run {
+            isLoadingStats = false
+        }
+    }
+}
+
+struct ProfileStatBox: View {
+    let icon: String
+    let value: Int
+    let label: String
+    let isLoading: Bool
+
+    var body: some View {
+        VStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(.churchTalkRed)
+            if isLoading {
+                ProgressView()
+                    .scaleEffect(0.8)
+            } else {
+                Text("\(value)")
+                    .font(.title2)
+                    .fontWeight(.bold)
+            }
+            Text(label)
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
 

@@ -3,39 +3,61 @@ import SwiftUI
 struct StreetDetailView: View {
     let street: OutreachStreet
     @State private var selectedDoor: OutreachDoor? = nil
-
-    // Demo doors
-    let doors: [OutreachDoor] = [
-        OutreachDoor(id: "1", houseNumber: "3040", fullAddress: "3040 E Lingard St", status: .notVisited),
-        OutreachDoor(id: "2", houseNumber: "3042", fullAddress: "3042 E Lingard St", status: .notHome, lastVisitedBy: "John D."),
-        OutreachDoor(id: "3", houseNumber: "3044", fullAddress: "3044 E Lingard St", status: .interested, residentName: "Maria Garcia"),
-        OutreachDoor(id: "4", houseNumber: "3046", fullAddress: "3046 E Lingard St", status: .notInterested),
-        OutreachDoor(id: "5", houseNumber: "3048", fullAddress: "3048 E Lingard St", status: .followUp, residentName: "David Kim"),
-        OutreachDoor(id: "6", houseNumber: "3050", fullAddress: "3050 E Lingard St", status: .notVisited),
-    ]
+    @State private var doors: [OutreachDoor] = []
+    @State private var isLoadingDoors = true
+    @State private var doorsError: String?
 
     var body: some View {
         ScrollView {
             LazyVStack(spacing: 8) {
-                // Live Activity Banner
-                HStack {
-                    Circle()
-                        .fill(Color.green)
-                        .frame(width: 8, height: 8)
-                    Text("John is knocking #3048")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
+                // Stats bar
+                HStack(spacing: 16) {
+                    Label("\(doors.count) doors", systemImage: "door.left.hand.closed")
+                    Label("\(Int(street.completionPercent))% complete", systemImage: "checkmark.circle")
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-                .background(Color.green.opacity(0.1))
-                .cornerRadius(8)
+                .font(.caption)
+                .foregroundColor(.secondary)
                 .padding(.horizontal)
 
-                // Door List
-                ForEach(doors) { door in
-                    DoorCard(door: door) {
-                        selectedDoor = door
+                if isLoadingDoors {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                    .padding(.vertical, 40)
+                } else if let error = doorsError {
+                    VStack(spacing: 12) {
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.title2)
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Button("Retry") {
+                            Task { await loadDoors() }
+                        }
+                        .buttonStyle(.bordered)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else if doors.isEmpty {
+                    VStack(spacing: 12) {
+                        Image(systemName: "door.left.hand.closed")
+                            .font(.title2)
+                            .foregroundColor(.secondary)
+                        Text("No doors on this street")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 40)
+                } else {
+                    // Door List
+                    ForEach(doors) { door in
+                        DoorCard(door: door) {
+                            selectedDoor = door
+                        }
                     }
                 }
             }
@@ -43,7 +65,36 @@ struct StreetDetailView: View {
         }
         .navigationTitle(street.name)
         .sheet(item: $selectedDoor) { door in
-            DoorKnockingView(door: door)
+            DoorKnockingView(door: door, onDoorUpdated: {
+                Task { await loadDoors() }
+            })
+        }
+        .task {
+            await loadDoors()
+        }
+        .refreshable {
+            await loadDoors()
+        }
+    }
+
+    private func loadDoors() async {
+        await MainActor.run {
+            isLoadingDoors = true
+            doorsError = nil
+        }
+
+        do {
+            let fetchedDoors = try await OutreachAPI.shared.getDoors(streetId: street.id)
+            await MainActor.run {
+                doors = fetchedDoors
+                isLoadingDoors = false
+            }
+        } catch {
+            print("Failed to load doors: \(error)")
+            await MainActor.run {
+                doorsError = "Failed to load doors"
+                isLoadingDoors = false
+            }
         }
     }
 }
@@ -60,6 +111,7 @@ struct DoorCard: View {
         case .notInterested: return .red
         case .followUp: return .purple
         case .doNotContact: return .black
+        case .alreadyMember: return .blue
         }
     }
 
@@ -71,6 +123,7 @@ struct DoorCard: View {
         case .notInterested: return "xmark.circle.fill"
         case .followUp: return "arrow.clockwise.circle.fill"
         case .doNotContact: return "hand.raised.fill"
+        case .alreadyMember: return "person.crop.circle.badge.checkmark"
         }
     }
 
@@ -130,8 +183,4 @@ struct DoorCard: View {
     }
 }
 
-#Preview {
-    NavigationStack {
-        StreetDetailView(street: OutreachStreet(id: "1", name: "E Lingard St", completionPercent: 60))
-    }
-}
+// Preview disabled - OutreachStreet requires API response format

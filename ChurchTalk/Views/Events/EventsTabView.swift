@@ -1,13 +1,16 @@
 import SwiftUI
 
 struct EventsTabView: View {
+    @Environment(\.dismiss) private var dismiss
     @State private var viewMode: EventViewMode = .list
     @State private var selectedCategory: EventCategory? = nil
     @State private var selectedDate = Date()
     @State private var showingEventDetail: ChurchEvent? = nil
 
-    // Sample data - replace with actual data from ViewModel
-    private let events = ChurchEvent.sampleEvents
+    // API data
+    @State private var events: [ChurchEvent] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -48,27 +51,80 @@ struct EventsTabView: View {
                 .padding(.bottom, 8)
 
                 // Content
-                switch viewMode {
-                case .list:
-                    EventListView(
-                        events: filteredEvents,
-                        onEventTap: { event in
-                            showingEventDetail = event
+                if isLoading {
+                    VStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                } else if let error = errorMessage {
+                    VStack(spacing: 12) {
+                        Spacer()
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.largeTitle)
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Button("Retry") {
+                            Task { await loadEvents() }
                         }
-                    )
-                case .calendar:
-                    EventCalendarView(
-                        events: filteredEvents,
-                        selectedDate: $selectedDate,
-                        onEventTap: { event in
-                            showingEventDetail = event
-                        }
-                    )
+                        .buttonStyle(.bordered)
+                        Spacer()
+                    }
+                } else {
+                    switch viewMode {
+                    case .list:
+                        EventListView(
+                            events: filteredEvents,
+                            onEventTap: { event in
+                                showingEventDetail = event
+                            }
+                        )
+                    case .calendar:
+                        EventCalendarView(
+                            events: filteredEvents,
+                            selectedDate: $selectedDate,
+                            onEventTap: { event in
+                                showingEventDetail = event
+                            }
+                        )
+                    }
                 }
             }
             .navigationTitle("Events")
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Done") { dismiss() }
+                }
+            }
+            .task {
+                await loadEvents()
+            }
+            .refreshable {
+                await loadEvents()
+            }
             .sheet(item: $showingEventDetail) { event in
                 EventDetailView(event: event)
+            }
+        }
+    }
+
+    private func loadEvents() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let fetchedEvents = try await EventsAPI.shared.getEvents(limit: 100)
+            await MainActor.run {
+                events = fetchedEvents
+                isLoading = false
+            }
+        } catch {
+            print("Failed to load events: \(error)")
+            await MainActor.run {
+                errorMessage = "Failed to load events"
+                isLoading = false
             }
         }
     }

@@ -2,15 +2,9 @@ import SwiftUI
 
 struct DirectoryListView: View {
     @State private var searchText = ""
-
-    let members: [Member] = [
-        Member(id: "1", firstName: "John", lastName: "Anderson", email: "john@church.org", churchId: "1", ministries: ["Worship", "Ushers"]),
-        Member(id: "2", firstName: "Sarah", lastName: "Williams", email: "sarah@church.org", churchId: "1", ministries: ["Youth"]),
-        Member(id: "3", firstName: "Michael", lastName: "Chen", email: "michael@church.org", churchId: "1", ministries: ["Outreach"]),
-        Member(id: "4", firstName: "Emily", lastName: "Davis", email: "emily@church.org", churchId: "1", ministries: ["Children", "Worship"]),
-        Member(id: "5", firstName: "David", lastName: "Kim", email: "david@church.org", churchId: "1", ministries: ["Tech"]),
-        Member(id: "6", firstName: "Lisa", lastName: "Thompson", email: "lisa@church.org", churchId: "1", ministries: ["Prayer"]),
-    ]
+    @State private var members: [Member] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var filteredMembers: [Member] {
         if searchText.isEmpty {
@@ -23,15 +17,84 @@ struct DirectoryListView: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                ForEach(filteredMembers) { member in
-                    NavigationLink(destination: MemberProfileView(member: member)) {
-                        MemberRow(member: member)
+            Group {
+                if isLoading {
+                    VStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                } else if let error = errorMessage {
+                    VStack(spacing: 12) {
+                        Spacer()
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.largeTitle)
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Button("Retry") {
+                            Task { await loadMembers() }
+                        }
+                        .buttonStyle(.bordered)
+                        Spacer()
+                    }
+                } else if members.isEmpty {
+                    VStack(spacing: 12) {
+                        Spacer()
+                        Image(systemName: "person.2.slash")
+                            .font(.largeTitle)
+                            .foregroundColor(.secondary)
+                        Text("No members found")
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Spacer()
+                    }
+                } else {
+                    List {
+                        ForEach(filteredMembers) { member in
+                            NavigationLink(destination: MemberProfileView(member: member)) {
+                                MemberRow(member: member)
+                            }
+                        }
+
+                        // Bottom padding for tab bar
+                        Color.clear.frame(height: 90)
+                            .listRowSeparator(.hidden)
                     }
                 }
             }
             .navigationTitle("Directory")
             .searchable(text: $searchText, prompt: "Search members")
+            .task {
+                await loadMembers()
+            }
+            .refreshable {
+                await loadMembers()
+            }
+            .onChange(of: searchText) { _, newValue in
+                // Debounced search - for server-side search in future
+                // Currently filtering client-side
+            }
+        }
+    }
+
+    private func loadMembers() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let response = try await MembersAPI.shared.getMembers(limit: 200)
+            await MainActor.run {
+                members = response.members
+                isLoading = false
+            }
+        } catch {
+            print("Failed to load members: \(error)")
+            await MainActor.run {
+                errorMessage = "Failed to load directory"
+                isLoading = false
+            }
         }
     }
 }

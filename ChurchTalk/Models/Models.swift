@@ -111,6 +111,71 @@ struct Church: Identifiable, Codable {
         self.foundedYear = foundedYear
         self.denomination = denomination
     }
+
+    // CodingKeys to handle _id from backend
+    private enum CodingKeys: String, CodingKey {
+        case id, _id, name, memberCount, imageUrl, coverImageUrl, address
+        case contactInfo, socialLinks, description, aboutContent, serviceTimes
+        case websiteUrl, foundedYear, denomination, pastor, leadershipTeam
+        case missionStatement, visionStatement, coreValues, ministries
+    }
+
+    // Custom decoder to handle _id from backend
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        // Handle both "id" and "_id" from backend
+        if let idValue = try? container.decode(String.self, forKey: .id) {
+            id = idValue
+        } else {
+            id = try container.decode(String.self, forKey: ._id)
+        }
+
+        name = try container.decode(String.self, forKey: .name)
+        memberCount = try container.decodeIfPresent(Int.self, forKey: .memberCount) ?? 0
+        imageUrl = try container.decodeIfPresent(String.self, forKey: .imageUrl)
+        coverImageUrl = try container.decodeIfPresent(String.self, forKey: .coverImageUrl)
+        address = try container.decodeIfPresent(ChurchAddress.self, forKey: .address)
+        contactInfo = try container.decodeIfPresent(ChurchContactInfo.self, forKey: .contactInfo)
+        socialLinks = try container.decodeIfPresent(ChurchSocialLinks.self, forKey: .socialLinks)
+        description = try container.decodeIfPresent(String.self, forKey: .description)
+        aboutContent = try container.decodeIfPresent(String.self, forKey: .aboutContent)
+        serviceTimes = try container.decodeIfPresent([ServiceTime].self, forKey: .serviceTimes)
+        websiteUrl = try container.decodeIfPresent(String.self, forKey: .websiteUrl)
+        foundedYear = try container.decodeIfPresent(Int.self, forKey: .foundedYear)
+        denomination = try container.decodeIfPresent(String.self, forKey: .denomination)
+        pastor = try container.decodeIfPresent(ChurchLeader.self, forKey: .pastor)
+        leadershipTeam = try container.decodeIfPresent([ChurchLeader].self, forKey: .leadershipTeam)
+        missionStatement = try container.decodeIfPresent(String.self, forKey: .missionStatement)
+        visionStatement = try container.decodeIfPresent(String.self, forKey: .visionStatement)
+        coreValues = try container.decodeIfPresent([String].self, forKey: .coreValues)
+        ministries = try container.decodeIfPresent([ChurchMinistry].self, forKey: .ministries)
+    }
+
+    // Custom encoder
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(memberCount, forKey: .memberCount)
+        try container.encodeIfPresent(imageUrl, forKey: .imageUrl)
+        try container.encodeIfPresent(coverImageUrl, forKey: .coverImageUrl)
+        try container.encodeIfPresent(address, forKey: .address)
+        try container.encodeIfPresent(contactInfo, forKey: .contactInfo)
+        try container.encodeIfPresent(socialLinks, forKey: .socialLinks)
+        try container.encodeIfPresent(description, forKey: .description)
+        try container.encodeIfPresent(aboutContent, forKey: .aboutContent)
+        try container.encodeIfPresent(serviceTimes, forKey: .serviceTimes)
+        try container.encodeIfPresent(websiteUrl, forKey: .websiteUrl)
+        try container.encodeIfPresent(foundedYear, forKey: .foundedYear)
+        try container.encodeIfPresent(denomination, forKey: .denomination)
+        try container.encodeIfPresent(pastor, forKey: .pastor)
+        try container.encodeIfPresent(leadershipTeam, forKey: .leadershipTeam)
+        try container.encodeIfPresent(missionStatement, forKey: .missionStatement)
+        try container.encodeIfPresent(visionStatement, forKey: .visionStatement)
+        try container.encodeIfPresent(coreValues, forKey: .coreValues)
+        try container.encodeIfPresent(ministries, forKey: .ministries)
+    }
 }
 
 // MARK: - Church Address
@@ -239,8 +304,8 @@ struct Member: Identifiable, Codable, Hashable {
     let email: String
     var phone: String?
     var avatarUrl: String?
-    let churchId: String
-    var ministries: [String] = []
+    var churchId: String?
+    var ministries: [String]
 
     // Extended profile fields
     var dateOfBirth: Date?
@@ -248,13 +313,83 @@ struct Member: Identifiable, Codable, Hashable {
     var profilePhotoUrl: String?
     var spiritualJourney: SpiritualJourney?
     var familyId: String?
-    var role: MemberRole = .member
+    var role: MemberRole
 
     // Fields from backend API
     var userId: String?
-    var isPendingApproval: Bool = false
+    var isPendingApproval: Bool?
     var createdAt: Date?
     var updatedAt: Date?
+
+    // Memberwise initializer for creating instances in code
+    init(
+        id: String,
+        firstName: String,
+        lastName: String,
+        email: String,
+        phone: String? = nil,
+        avatarUrl: String? = nil,
+        churchId: String? = nil,
+        ministries: [String] = [],
+        dateOfBirth: Date? = nil,
+        address: Address? = nil,
+        profilePhotoUrl: String? = nil,
+        spiritualJourney: SpiritualJourney? = nil,
+        familyId: String? = nil,
+        role: MemberRole = .member,
+        userId: String? = nil,
+        isPendingApproval: Bool? = nil,
+        createdAt: Date? = nil,
+        updatedAt: Date? = nil
+    ) {
+        self.id = id
+        self.firstName = firstName
+        self.lastName = lastName
+        self.email = email
+        self.phone = phone
+        self.avatarUrl = avatarUrl
+        self.churchId = churchId
+        self.ministries = ministries
+        self.dateOfBirth = dateOfBirth
+        self.address = address
+        self.profilePhotoUrl = profilePhotoUrl
+        self.spiritualJourney = spiritualJourney
+        self.familyId = familyId
+        self.role = role
+        self.userId = userId
+        self.isPendingApproval = isPendingApproval
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+
+    // Custom decoder to handle missing fields with defaults
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        firstName = try container.decode(String.self, forKey: .firstName)
+        lastName = try container.decode(String.self, forKey: .lastName)
+        email = try container.decode(String.self, forKey: .email)
+        phone = try container.decodeIfPresent(String.self, forKey: .phone)
+        avatarUrl = try container.decodeIfPresent(String.self, forKey: .avatarUrl)
+        churchId = try container.decodeIfPresent(String.self, forKey: .churchId)
+        ministries = try container.decodeIfPresent([String].self, forKey: .ministries) ?? []
+        dateOfBirth = try container.decodeIfPresent(Date.self, forKey: .dateOfBirth)
+        address = try container.decodeIfPresent(Address.self, forKey: .address)
+        profilePhotoUrl = try container.decodeIfPresent(String.self, forKey: .profilePhotoUrl)
+        spiritualJourney = try container.decodeIfPresent(SpiritualJourney.self, forKey: .spiritualJourney)
+        familyId = try container.decodeIfPresent(String.self, forKey: .familyId)
+        role = try container.decodeIfPresent(MemberRole.self, forKey: .role) ?? .member
+        userId = try container.decodeIfPresent(String.self, forKey: .userId)
+        isPendingApproval = try container.decodeIfPresent(Bool.self, forKey: .isPendingApproval)
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, firstName, lastName, email, phone, avatarUrl, churchId, ministries
+        case dateOfBirth, address, profilePhotoUrl, spiritualJourney, familyId, role
+        case userId, isPendingApproval, createdAt, updatedAt
+    }
 
     var fullName: String {
         "\(firstName) \(lastName)"
@@ -272,14 +407,44 @@ struct Member: Identifiable, Codable, Hashable {
     }
 
     var isAdmin: Bool {
-        role == .admin || role == .leader
+        role.isAdminRole || role == .leader
     }
 }
 
 enum MemberRole: String, Codable {
+    case owner
     case admin
     case leader
+    case staff
     case member
+    case visitor
+
+    /// Check if this role has admin privileges
+    var isAdminRole: Bool {
+        self == .owner || self == .admin
+    }
+
+    /// Check if this role can manage members
+    var canManageMembers: Bool {
+        [.owner, .admin, .leader].contains(self)
+    }
+
+    /// Check if this role can create content
+    var canCreateContent: Bool {
+        [.owner, .admin, .leader, .staff].contains(self)
+    }
+
+    /// Display name for UI
+    var displayName: String {
+        switch self {
+        case .owner: return "Owner"
+        case .admin: return "Admin"
+        case .leader: return "Leader"
+        case .staff: return "Staff"
+        case .member: return "Member"
+        case .visitor: return "Visitor"
+        }
+    }
 }
 
 // MARK: - Address
@@ -448,13 +613,35 @@ struct Comment: Identifiable, Codable, Hashable {
 
 // MARK: - Outreach
 
-struct Territory: Identifiable, Codable {
+struct Territory: Identifiable, Decodable {
     let id: String
+    let churchId: String
     let name: String
-    var streets: [OutreachStreet] = []
-    var status: TerritoryStatus = .unassigned
+    var status: TerritoryStatus
     var assignedTo: String?
-    var progress: Double = 0
+    var progress: Double
+    var createdAt: Date
+    var updatedAt: Date
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let idValue = try? container.decode(String.self, forKey: .id) {
+            id = idValue
+        } else {
+            id = try container.decode(String.self, forKey: ._id)
+        }
+        churchId = try container.decode(String.self, forKey: .churchId)
+        name = try container.decode(String.self, forKey: .name)
+        status = try container.decodeIfPresent(TerritoryStatus.self, forKey: .status) ?? .unassigned
+        assignedTo = try container.decodeIfPresent(String.self, forKey: .assignedTo)
+        progress = try container.decodeIfPresent(Double.self, forKey: .progress) ?? 0
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, _id, churchId, name, status, assignedTo, progress, createdAt, updatedAt
+    }
 }
 
 enum TerritoryStatus: String, Codable {
@@ -462,24 +649,120 @@ enum TerritoryStatus: String, Codable {
     case assigned
     case inProgress = "in_progress"
     case completed
+
+    var displayName: String {
+        switch self {
+        case .unassigned: return "Unassigned"
+        case .assigned: return "Assigned"
+        case .inProgress: return "In Progress"
+        case .completed: return "Completed"
+        }
+    }
 }
 
-struct OutreachStreet: Identifiable, Codable {
+struct OutreachStreet: Identifiable, Decodable {
     let id: String
+    let territoryId: String
     let name: String
-    var doors: [OutreachDoor] = []
-    var completionPercent: Double = 0
+    var completionPercent: Double
+    var estimatedHouses: Int?
+    var lastVisitedAt: Date?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let idValue = try? container.decode(String.self, forKey: .id) {
+            id = idValue
+        } else {
+            id = try container.decode(String.self, forKey: ._id)
+        }
+        territoryId = try container.decode(String.self, forKey: .territoryId)
+        name = try container.decode(String.self, forKey: .name)
+        completionPercent = try container.decodeIfPresent(Double.self, forKey: .completionPercent) ?? 0
+        estimatedHouses = try container.decodeIfPresent(Int.self, forKey: .estimatedHouses)
+        lastVisitedAt = try container.decodeIfPresent(Date.self, forKey: .lastVisitedAt)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, _id, territoryId, name, completionPercent, estimatedHouses, lastVisitedAt
+    }
 }
 
-struct OutreachDoor: Identifiable, Codable {
+struct OutreachDoor: Identifiable, Decodable {
     let id: String
+    let streetId: String
     let houseNumber: String
     let fullAddress: String
-    var status: DoorStatus = .notVisited
+    var status: DoorStatus
     var residentName: String?
     var notes: String?
     var lastVisitedAt: Date?
     var lastVisitedBy: String?
+    var latitude: Double?
+    var longitude: Double?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let idValue = try? container.decode(String.self, forKey: .id) {
+            id = idValue
+        } else {
+            id = try container.decode(String.self, forKey: ._id)
+        }
+        streetId = try container.decode(String.self, forKey: .streetId)
+        houseNumber = try container.decode(String.self, forKey: .houseNumber)
+        fullAddress = try container.decode(String.self, forKey: .fullAddress)
+        status = try container.decodeIfPresent(DoorStatus.self, forKey: .status) ?? .notVisited
+        residentName = try container.decodeIfPresent(String.self, forKey: .residentName)
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        lastVisitedAt = try container.decodeIfPresent(Date.self, forKey: .lastVisitedAt)
+        lastVisitedBy = try container.decodeIfPresent(String.self, forKey: .lastVisitedBy)
+        latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
+        longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, _id, streetId, houseNumber, fullAddress, status
+        case residentName, notes, lastVisitedAt, lastVisitedBy, latitude, longitude
+    }
+}
+
+struct ActiveCollaborator: Identifiable, Decodable {
+    let id: String
+    let churchId: String
+    let territoryId: String
+    let memberId: String
+    let memberName: String
+    let memberInitials: String
+    var currentDoorId: String?
+    var checkedInAt: Date
+    var lastActiveAt: Date
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let idValue = try? container.decode(String.self, forKey: .id) {
+            id = idValue
+        } else {
+            id = try container.decode(String.self, forKey: ._id)
+        }
+        churchId = try container.decode(String.self, forKey: .churchId)
+        territoryId = try container.decode(String.self, forKey: .territoryId)
+        memberId = try container.decode(String.self, forKey: .memberId)
+        memberName = try container.decode(String.self, forKey: .memberName)
+        memberInitials = try container.decode(String.self, forKey: .memberInitials)
+        currentDoorId = try container.decodeIfPresent(String.self, forKey: .currentDoorId)
+        checkedInAt = try container.decodeIfPresent(Date.self, forKey: .checkedInAt) ?? Date()
+        lastActiveAt = try container.decodeIfPresent(Date.self, forKey: .lastActiveAt) ?? Date()
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, _id, churchId, territoryId, memberId, memberName, memberInitials
+        case currentDoorId, checkedInAt, lastActiveAt
+    }
+}
+
+struct OutreachStats: Codable {
+    let doorsKnocked: Int
+    let followUps: Int
+    let territoriesAssigned: Int
 }
 
 enum DoorStatus: String, Codable {
@@ -489,6 +772,7 @@ enum DoorStatus: String, Codable {
     case notInterested = "not_interested"
     case followUp = "follow_up"
     case doNotContact = "do_not_contact"
+    case alreadyMember = "already_member"
 
     var displayName: String {
         switch self {
@@ -498,6 +782,7 @@ enum DoorStatus: String, Codable {
         case .notInterested: return "Not Interested"
         case .followUp: return "Follow Up"
         case .doNotContact: return "Do Not Contact"
+        case .alreadyMember: return "Already Member"
         }
     }
 
@@ -508,6 +793,7 @@ enum DoorStatus: String, Codable {
         case .interested: return "green"
         case .notInterested: return "red"
         case .followUp: return "purple"
+        case .alreadyMember: return "blue"
         case .doNotContact: return "black"
         }
     }
@@ -552,14 +838,3 @@ struct PrayerRequest: Identifiable, Codable {
     }
 }
 
-// MARK: - Collaboration
-
-struct ActiveCollaborator: Identifiable, Codable {
-    let id: String
-    let memberId: String
-    let memberName: String
-    var memberInitials: String
-    var currentDoorId: String?
-    let checkedInAt: Date
-    var lastActiveAt: Date
-}

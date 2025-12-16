@@ -8,13 +8,10 @@ struct MySoulsView: View {
     @State private var selectedSoul: Soul?
     @State private var showShareSheet: Soul?
 
-    // Demo data - in production, filter by addedBy == currentMember.id
-    @State private var mySouls: [Soul] = [
-        Soul(id: "s1", firstName: "Maria", lastName: "Garcia", email: "maria@email.com", phone: "(555) 111-2222", soulType: .prospect, spiritualStage: .gospelPresentation, notes: "Met during outreach. Very interested.", lastContactDate: Date().addingTimeInterval(-86400 * 3), createdAt: Date().addingTimeInterval(-86400 * 7), updatedAt: Date(), addedBy: "currentUser", shareStatus: .shared),
-        Soul(id: "s2", firstName: "James", lastName: "Wilson", soulType: .visitor, spiritualStage: .saved, notes: "First time visitor.", lastContactDate: Date().addingTimeInterval(-86400), createdAt: Date().addingTimeInterval(-86400 * 14), updatedAt: Date(), addedBy: "currentUser", shareStatus: .pendingReview),
-        Soul(id: "s3", firstName: "David", lastName: "Brown", phone: "(555) 333-4444", soulType: .prospect, spiritualStage: .initialContact, notes: "Knocked on door. Open to learning more.", lastContactDate: Date().addingTimeInterval(-86400 * 5), createdAt: Date().addingTimeInterval(-86400 * 5), updatedAt: Date(), addedBy: "currentUser", shareStatus: .private),
-        Soul(id: "s4", firstName: "Emily", lastName: "Chen", soulType: .prospect, spiritualStage: .gospelPresentation, notes: "Met at community event.", createdAt: Date().addingTimeInterval(-86400 * 2), updatedAt: Date(), addedBy: "currentUser", shareStatus: .private)
-    ]
+    // API data
+    @State private var mySouls: [Soul] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var filteredSouls: [Soul] {
         if let filter = selectedFilter {
@@ -87,7 +84,28 @@ struct MySoulsView: View {
                 Divider()
                     .padding(.top, 8)
 
-                if filteredSouls.isEmpty {
+                if isLoading {
+                    VStack {
+                        Spacer()
+                        ProgressView()
+                        Spacer()
+                    }
+                } else if let error = errorMessage {
+                    VStack(spacing: 12) {
+                        Spacer()
+                        Image(systemName: "wifi.exclamationmark")
+                            .font(.largeTitle)
+                            .foregroundColor(.orange)
+                        Text(error)
+                            .font(.subheadline)
+                            .foregroundColor(.secondary)
+                        Button("Retry") {
+                            Task { await loadSouls() }
+                        }
+                        .buttonStyle(.bordered)
+                        Spacer()
+                    }
+                } else if filteredSouls.isEmpty {
                     EmptyMySoulsView()
                 } else {
                     List {
@@ -120,11 +138,16 @@ struct MySoulsView: View {
                     }
                 }
             }
+            .task {
+                await loadSouls()
+            }
+            .refreshable {
+                await loadSouls()
+            }
             .sheet(isPresented: $showAddSoul) {
                 AddSoulView { newSoul in
-                    var soulWithOwner = newSoul
-                    soulWithOwner.addedBy = authViewModel.currentMember?.id ?? "currentUser"
-                    mySouls.append(soulWithOwner)
+                    // Refresh to get the new soul from server
+                    Task { await loadSouls() }
                 }
             }
             .sheet(item: $selectedSoul) { soul in
@@ -135,7 +158,28 @@ struct MySoulsView: View {
                     if let index = mySouls.firstIndex(where: { $0.id == updatedSoul.id }) {
                         mySouls[index] = updatedSoul
                     }
+                    // Also refresh from server to ensure consistency
+                    Task { await loadSouls() }
                 }
+            }
+        }
+    }
+
+    private func loadSouls() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let fetchedSouls = try await SoulsAPI.shared.getSouls(mine: true, limit: 100)
+            await MainActor.run {
+                mySouls = fetchedSouls
+                isLoading = false
+            }
+        } catch {
+            print("Failed to load souls: \(error)")
+            await MainActor.run {
+                errorMessage = "Failed to load souls"
+                isLoading = false
             }
         }
     }

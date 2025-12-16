@@ -5,6 +5,9 @@ struct NewPrayerRequestView: View {
     @State private var content = ""
     @State private var isAnonymous = false
     @State private var isSubmitting = false
+    @State private var errorMessage: String?
+
+    var onPrayerCreated: (() -> Void)? = nil
 
     var isValid: Bool {
         content.trimmingCharacters(in: .whitespacesAndNewlines).count >= 10
@@ -52,10 +55,34 @@ struct NewPrayerRequestView: View {
 
     private func submitRequest() {
         isSubmitting = true
-        // Simulate API call
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-            isSubmitting = false
-            dismiss()
+        errorMessage = nil
+
+        Task {
+            do {
+                _ = try await PrayerAPI.shared.createPrayer(
+                    content: content.trimmingCharacters(in: .whitespacesAndNewlines),
+                    isAnonymous: isAnonymous
+                )
+                await MainActor.run {
+                    isSubmitting = false
+                    onPrayerCreated?()
+                    dismiss()
+
+                    // Success haptic
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.success)
+                }
+            } catch {
+                print("Failed to create prayer: \(error)")
+                await MainActor.run {
+                    errorMessage = "Failed to submit prayer request. Please try again."
+                    isSubmitting = false
+
+                    // Error haptic
+                    let generator = UINotificationFeedbackGenerator()
+                    generator.notificationOccurred(.error)
+                }
+            }
         }
     }
 }

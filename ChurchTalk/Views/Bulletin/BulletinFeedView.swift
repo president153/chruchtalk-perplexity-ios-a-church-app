@@ -118,68 +118,72 @@ struct BulletinPostCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            // Tappable content area (for navigation)
-            VStack(alignment: .leading, spacing: 12) {
-                // Author Header
-                HStack(spacing: 12) {
-                    Circle()
-                        .fill(Color.churchTalkRed.opacity(0.2))
-                        .frame(width: 44, height: 44)
-                        .overlay(
-                            Text(post.author.initials)
+            // Tappable content area (for navigation) - using Button instead of onTapGesture
+            Button(action: {
+                onNavigate?()
+            }) {
+                VStack(alignment: .leading, spacing: 12) {
+                    // Author Header
+                    HStack(spacing: 12) {
+                        Circle()
+                            .fill(Color.churchTalkRed.opacity(0.2))
+                            .frame(width: 44, height: 44)
+                            .overlay(
+                                Text(post.author.initials)
+                                    .font(.headline)
+                                    .foregroundColor(.churchTalkRed)
+                            )
+
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(post.author.fullName)
                                 .font(.headline)
-                                .foregroundColor(.churchTalkRed)
-                        )
+                                .foregroundColor(.primary)
+                            Text(post.publishedAt.timeAgoDisplay())
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
 
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(post.author.fullName)
-                            .font(.headline)
-                        Text(post.publishedAt.timeAgoDisplay())
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                        Spacer()
 
-                    Spacer()
-
-                    Button(action: {}) {
                         Image(systemName: "ellipsis")
                             .foregroundColor(.secondary)
                     }
-                }
 
-                // Content
-                Text(post.title)
-                    .font(.title3)
-                    .fontWeight(.semibold)
+                    // Content
+                    Text(post.title)
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.primary)
+                        .multilineTextAlignment(.leading)
 
-                Text(post.content.strippingHTML())
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .lineLimit(3)
+                    Text(post.content.strippingHTML())
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .lineLimit(3)
+                        .multilineTextAlignment(.leading)
 
-                // YouTube indicator
-                if post.youtubeUrl != nil {
-                    HStack {
-                        Image(systemName: "play.rectangle.fill")
-                            .foregroundColor(.red)
-                        Text("Watch Video")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
+                    // YouTube indicator
+                    if post.youtubeUrl != nil {
+                        HStack {
+                            Image(systemName: "play.rectangle.fill")
+                                .foregroundColor(.red)
+                            Text("Watch Video")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .padding(.vertical, 8)
+                        .padding(.horizontal, 12)
+                        .background(Color.gray.opacity(0.1))
+                        .cornerRadius(8)
                     }
-                    .padding(.vertical, 8)
-                    .padding(.horizontal, 12)
-                    .background(Color.gray.opacity(0.1))
-                    .cornerRadius(8)
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                onNavigate?()
-            }
+            .buttonStyle(.plain)
 
             Divider()
 
-            // Reactions Bar - NOT in tap area for navigation
+            // Reactions Bar - Separate from navigation button
             HStack(spacing: 24) {
                 ReactionButton(
                     type: .like,
@@ -221,8 +225,11 @@ struct BulletinPostCard: View {
         .shadow(color: Color.black.opacity(0.05), radius: 5, y: 2)
     }
 
+    @State private var isTogglingReaction = false
+
     private func toggleReaction(_ type: ReactionType) async {
-        print("🔵 toggleReaction called with type: \(type)")
+        guard !isTogglingReaction else { return }
+        isTogglingReaction = true
 
         // Optimistic update
         let previousReaction = userReaction
@@ -236,7 +243,6 @@ struct BulletinPostCard: View {
             case .amen: currentReactions.amen = max(0, currentReactions.amen - 1)
             }
         } else {
-            // Remove previous reaction count
             if let prev = previousReaction {
                 switch prev {
                 case .like: currentReactions.like = max(0, currentReactions.like - 1)
@@ -244,7 +250,6 @@ struct BulletinPostCard: View {
                 case .amen: currentReactions.amen = max(0, currentReactions.amen - 1)
                 }
             }
-            // Add new reaction
             userReaction = type
             switch type {
             case .like: currentReactions.like += 1
@@ -253,26 +258,26 @@ struct BulletinPostCard: View {
             }
         }
 
-        // API call
         do {
             let response = try await BulletinAPI.shared.toggleReaction(
                 postId: post.id,
                 reactionType: type
             )
-            print("🟢 Reaction toggle success: \(response)")
             await MainActor.run {
                 currentReactions = Reactions(
                     like: response.reactions.like,
                     pray: response.reactions.pray,
                     amen: response.reactions.amen
                 )
+                // Sync user reaction state with server
+                userReaction = response.added ? type : nil
+                isTogglingReaction = false
             }
         } catch {
-            print("❌ Reaction toggle failed: \(error)")
-            // Revert on error
             await MainActor.run {
                 userReaction = previousReaction
                 currentReactions = previousReactions
+                isTogglingReaction = false
             }
         }
     }
@@ -284,11 +289,11 @@ struct ReactionButton: View {
     let isSelected: Bool
     let action: () -> Void
 
-    var icon: String {
+    var emoji: String {
         switch type {
-        case .like: return isSelected ? "heart.fill" : "heart"
-        case .pray: return "hands.sparkles.fill"
-        case .amen: return isSelected ? "checkmark.circle.fill" : "checkmark.circle"
+        case .like: return "❤️"
+        case .pray: return "🙏"
+        case .amen: return "🙌"
         }
     }
 
@@ -296,55 +301,82 @@ struct ReactionButton: View {
         switch type {
         case .like: return .red
         case .pray: return .purple
-        case .amen: return .green
+        case .amen: return .orange
         }
     }
 
     var body: some View {
-        Button(action: {
+        Button {
             // Haptic feedback
-            let generator = UIImpactFeedbackGenerator(style: .light)
+            let generator = UIImpactFeedbackGenerator(style: .medium)
+            generator.prepare()
             generator.impactOccurred()
-            print("🔴 ReactionButton tapped: \(type)")
             action()
-        }) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .foregroundColor(isSelected ? color : .secondary)
+        } label: {
+            HStack(spacing: 6) {
+                Text(emoji)
+                    .font(.system(size: 18))
                     .scaleEffect(isSelected ? 1.2 : 1.0)
                     .animation(.spring(response: 0.3, dampingFraction: 0.5), value: isSelected)
                 Text("\(count)")
+                    .font(.subheadline)
                     .foregroundColor(isSelected ? color : .secondary)
             }
-            .font(.subheadline)
-            .padding(.vertical, 8)
-            .padding(.horizontal, 4)
+            .padding(.vertical, 10)
+            .padding(.horizontal, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? color.opacity(0.1) : Color.clear)
+            )
             .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .buttonStyle(ReactionButtonStyle())
         .animation(.easeInOut(duration: 0.2), value: isSelected)
+    }
+}
+
+// Custom button style for reactions to ensure taps are captured
+struct ReactionButtonStyle: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .scaleEffect(configuration.isPressed ? 0.9 : 1.0)
+            .animation(.easeInOut(duration: 0.1), value: configuration.isPressed)
     }
 }
 
 extension Date {
     func timeAgoDisplay() -> String {
-        let calendar = Calendar.current
         let now = Date()
-        let components = calendar.dateComponents([.minute, .hour, .day, .weekOfYear], from: self, to: now)
+        let diffSeconds = Int(now.timeIntervalSince(self))
+        let diffMinutes = diffSeconds / 60
+        let diffHours = diffMinutes / 60
+        let diffDays = diffHours / 24
+        let diffWeeks = diffDays / 7
+        let diffMonths = diffDays / 30
 
-        if let weeks = components.weekOfYear, weeks > 0 {
-            return "\(weeks)w ago"
+        if diffSeconds < 60 {
+            return "Just now"
         }
-        if let days = components.day, days > 0 {
-            return "\(days)d ago"
+        if diffMinutes < 60 {
+            return "\(diffMinutes)m ago"
         }
-        if let hours = components.hour, hours > 0 {
-            return "\(hours)h ago"
+        if diffHours < 24 {
+            return "\(diffHours)h ago"
         }
-        if let minutes = components.minute, minutes > 0 {
-            return "\(minutes)m ago"
+        if diffDays < 7 {
+            return "\(diffDays)d ago"
         }
-        return "Just now"
+        if diffWeeks < 4 {
+            return "\(diffWeeks)w ago"
+        }
+        if diffMonths < 12 {
+            return "\(diffMonths)mo ago"
+        }
+
+        // Full date for older posts
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, yyyy"
+        return formatter.string(from: self)
     }
 }
 

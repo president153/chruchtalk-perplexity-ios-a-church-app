@@ -68,13 +68,13 @@ struct Soul: Identifiable, Codable {
     let lastName: String
     var email: String?
     var phone: String?
-    let soulType: SoulType
+    var soulType: SoulType
     var spiritualStage: SpiritualStage
     var assignedTo: String?
     var notes: String?
     var lastContactDate: Date?
     var nextFollowUpDate: Date?
-    let createdAt: Date
+    var createdAt: Date
     var updatedAt: Date
 
     // Optional link to Member if they become one
@@ -82,8 +82,75 @@ struct Soul: Identifiable, Codable {
 
     // Ownership and sharing
     var addedBy: String?  // Member ID of who added this soul
-    var shareStatus: SoulShareStatus = .private
+    var shareStatus: SoulShareStatus
     var shareRejectionReason: String?
+
+    // Memberwise initializer for creating instances in code
+    init(
+        id: String,
+        firstName: String,
+        lastName: String,
+        email: String? = nil,
+        phone: String? = nil,
+        soulType: SoulType = .prospect,
+        spiritualStage: SpiritualStage = .initialContact,
+        assignedTo: String? = nil,
+        notes: String? = nil,
+        lastContactDate: Date? = nil,
+        nextFollowUpDate: Date? = nil,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        memberId: String? = nil,
+        addedBy: String? = nil,
+        shareStatus: SoulShareStatus = .private,
+        shareRejectionReason: String? = nil
+    ) {
+        self.id = id
+        self.firstName = firstName
+        self.lastName = lastName
+        self.email = email
+        self.phone = phone
+        self.soulType = soulType
+        self.spiritualStage = spiritualStage
+        self.assignedTo = assignedTo
+        self.notes = notes
+        self.lastContactDate = lastContactDate
+        self.nextFollowUpDate = nextFollowUpDate
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.memberId = memberId
+        self.addedBy = addedBy
+        self.shareStatus = shareStatus
+        self.shareRejectionReason = shareRejectionReason
+    }
+
+    // Custom decoder to handle missing fields with defaults
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        firstName = try container.decode(String.self, forKey: .firstName)
+        lastName = try container.decode(String.self, forKey: .lastName)
+        email = try container.decodeIfPresent(String.self, forKey: .email)
+        phone = try container.decodeIfPresent(String.self, forKey: .phone)
+        soulType = try container.decodeIfPresent(SoulType.self, forKey: .soulType) ?? .prospect
+        spiritualStage = try container.decodeIfPresent(SpiritualStage.self, forKey: .spiritualStage) ?? .initialContact
+        assignedTo = try container.decodeIfPresent(String.self, forKey: .assignedTo)
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+        lastContactDate = try container.decodeIfPresent(Date.self, forKey: .lastContactDate)
+        nextFollowUpDate = try container.decodeIfPresent(Date.self, forKey: .nextFollowUpDate)
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? Date()
+        memberId = try container.decodeIfPresent(String.self, forKey: .memberId)
+        addedBy = try container.decodeIfPresent(String.self, forKey: .addedBy)
+        shareStatus = try container.decodeIfPresent(SoulShareStatus.self, forKey: .shareStatus) ?? .private
+        shareRejectionReason = try container.decodeIfPresent(String.self, forKey: .shareRejectionReason)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, firstName, lastName, email, phone, soulType, spiritualStage
+        case assignedTo, notes, lastContactDate, nextFollowUpDate
+        case createdAt, updatedAt, memberId, addedBy, shareStatus, shareRejectionReason
+    }
 
     var fullName: String {
         "\(firstName) \(lastName)"

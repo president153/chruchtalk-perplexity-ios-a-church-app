@@ -1,42 +1,80 @@
 import SwiftUI
 
 struct PrayerWallView: View {
+    @Environment(\.dismiss) private var dismiss
     @EnvironmentObject var authViewModel: AuthViewModel
     @State private var showNewRequest = false
     @State private var showModeration = false
-
-    // Demo approved requests
-    let requests: [PrayerRequest] = [
-        PrayerRequest(id: "1", content: "Please pray for my mother's surgery tomorrow. The doctors say it's routine but I'm still worried.", authorId: "1", authorName: "Sarah M.", isAnonymous: false, prayerCount: 47, createdAt: Date().addingTimeInterval(-3600), status: .approved),
-        PrayerRequest(id: "2", content: "Struggling with job search. Need guidance and peace during this season.", authorId: "2", isAnonymous: true, prayerCount: 23, createdAt: Date().addingTimeInterval(-86400), status: .approved),
-        PrayerRequest(id: "3", content: "Praise report! My son accepted Christ this weekend!", authorId: "3", authorName: "Michael C.", isAnonymous: false, prayerCount: 89, createdAt: Date().addingTimeInterval(-172800), status: .approved),
-        PrayerRequest(id: "4", content: "Please pray for our missions team traveling to Guatemala next week.", authorId: "4", authorName: "Pastor John", isAnonymous: false, prayerCount: 156, createdAt: Date().addingTimeInterval(-259200), status: .approved),
-    ]
-
-    // Only show approved prayers on the wall
-    var approvedRequests: [PrayerRequest] {
-        requests.filter { $0.isApproved }
-    }
+    @State private var prayers: [PrayerRequest] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
             ScrollView {
                 LazyVStack(spacing: 16) {
-                    ForEach(approvedRequests) { request in
-                        PrayerRequestCard(request: request)
+                    if isLoading {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
+                    } else if let error = errorMessage {
+                        VStack(spacing: 12) {
+                            Image(systemName: "wifi.exclamationmark")
+                                .font(.largeTitle)
+                                .foregroundColor(.orange)
+                            Text(error)
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Button("Retry") {
+                                Task { await loadPrayers() }
+                            }
+                            .buttonStyle(.bordered)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+                    } else if prayers.isEmpty {
+                        VStack(spacing: 12) {
+                            Image(systemName: "hands.sparkles")
+                                .font(.largeTitle)
+                                .foregroundColor(.secondary)
+                            Text("No prayer requests yet")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                            Text("Be the first to share a prayer request")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 40)
+                    } else {
+                        ForEach(prayers) { request in
+                            PrayerRequestCard(request: request, onPrayerCountUpdated: { updatedPrayer in
+                                if let index = prayers.firstIndex(where: { $0.id == updatedPrayer.id }) {
+                                    prayers[index] = updatedPrayer
+                                }
+                            })
                             .transition(ChurchTalkAnimations.cardAppear)
+                        }
                     }
                 }
                 .padding()
             }
+            .refreshable {
+                await loadPrayers()
+            }
             .navigationTitle("Prayer Wall")
             .toolbar {
-                // Admin moderation button
-                if authViewModel.currentMember?.isAdmin == true {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button(action: { showModeration = true }) {
-                            Image(systemName: "clock.badge.checkmark")
-                                .foregroundColor(.churchTalkRed)
+                // Done button to close sheet
+                ToolbarItem(placement: .navigationBarLeading) {
+                    HStack(spacing: 12) {
+                        Button("Done") { dismiss() }
+
+                        // Admin moderation button
+                        if authViewModel.currentMember?.isAdmin == true {
+                            Button(action: { showModeration = true }) {
+                                Image(systemName: "clock.badge.checkmark")
+                                    .foregroundColor(.churchTalkRed)
+                            }
                         }
                     }
                 }
@@ -49,10 +87,34 @@ struct PrayerWallView: View {
                 }
             }
             .sheet(isPresented: $showNewRequest) {
-                NewPrayerRequestView()
+                NewPrayerRequestView(onPrayerCreated: {
+                    Task { await loadPrayers() }
+                })
             }
             .sheet(isPresented: $showModeration) {
                 PrayerModerationView()
+            }
+            .task {
+                await loadPrayers()
+            }
+        }
+    }
+
+    private func loadPrayers() async {
+        isLoading = true
+        errorMessage = nil
+
+        do {
+            let fetchedPrayers = try await PrayerAPI.shared.getPrayers(limit: 50)
+            await MainActor.run {
+                prayers = fetchedPrayers
+                isLoading = false
+            }
+        } catch {
+            print("Failed to load prayers: \(error)")
+            await MainActor.run {
+                errorMessage = "Failed to load prayers"
+                isLoading = false
             }
         }
     }
@@ -60,8 +122,18 @@ struct PrayerWallView: View {
 
 struct PrayerRequestCard: View {
     let request: PrayerRequest
-    @State private var hasPrayed = false
+    var onPrayerCountUpdated: ((PrayerRequest) -> Void)? = nil
+    @State private var hasPrayed: Bool
+    @State private var currentPrayerCount: Int
     @State private var showAnimation = false
+    @State private var isSubmitting = false
+
+    init(request: PrayerRequest, onPrayerCountUpdated: ((PrayerRequest) -> Void)? = nil) {
+        self.request = request
+        self.onPrayerCountUpdated = onPrayerCountUpdated
+        self._hasPrayed = State(initialValue: request.hasPrayed)
+        self._currentPrayerCount = State(initialValue: request.prayerCount)
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -89,7 +161,7 @@ struct PrayerRequestCard: View {
                 HStack(spacing: 4) {
                     Image(systemName: "hands.sparkles.fill")
                         .foregroundColor(.churchTalkRed)
-                    Text("\(request.prayerCount + (hasPrayed ? 1 : 0)) prayers")
+                    Text("\(currentPrayerCount) prayers")
                         .foregroundColor(.secondary)
                 }
                 .font(.subheadline)
@@ -97,16 +169,8 @@ struct PrayerRequestCard: View {
                 Spacer()
 
                 Button(action: {
-                    if !hasPrayed {
-                        hasPrayed = true
-                        showAnimation = true
-                        // Haptic feedback
-                        let generator = UIImpactFeedbackGenerator(style: .medium)
-                        generator.impactOccurred()
-
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
-                            showAnimation = false
-                        }
+                    if !hasPrayed && !isSubmitting {
+                        prayForRequest()
                     }
                 }) {
                     HStack(spacing: 6) {
@@ -136,6 +200,57 @@ struct PrayerRequestCard: View {
                 }
             }
         )
+    }
+
+    private func prayForRequest() {
+        isSubmitting = true
+        hasPrayed = true
+        showAnimation = true
+
+        // Optimistic update
+        currentPrayerCount += 1
+
+        // Haptic feedback
+        let generator = UIImpactFeedbackGenerator(style: .medium)
+        generator.impactOccurred()
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
+            showAnimation = false
+        }
+
+        // Call API
+        Task {
+            do {
+                let response = try await PrayerAPI.shared.prayFor(prayerId: request.id)
+                await MainActor.run {
+                    // Handle both success and "already prayed" responses
+                    // If message exists, user already prayed - keep optimistic state
+                    if response.message != nil {
+                        // Already prayed - keep current state
+                        isSubmitting = false
+                    } else {
+                        // Success - update with server values
+                        currentPrayerCount = response.prayerCount ?? currentPrayerCount
+                        hasPrayed = response.hasPrayed ?? true
+                        isSubmitting = false
+
+                        // Update parent
+                        var updatedRequest = request
+                        updatedRequest.prayerCount = response.prayerCount ?? currentPrayerCount
+                        updatedRequest.hasPrayed = response.hasPrayed ?? true
+                        onPrayerCountUpdated?(updatedRequest)
+                    }
+                }
+            } catch {
+                print("Failed to pray: \(error)")
+                await MainActor.run {
+                    // Revert on error
+                    currentPrayerCount -= 1
+                    hasPrayed = false
+                    isSubmitting = false
+                }
+            }
+        }
     }
 }
 

@@ -7,6 +7,11 @@
 
 import Foundation
 
+/// Notification posted when API receives 401 unauthorized response
+extension Notification.Name {
+    static let apiUnauthorized = Notification.Name("APIClientUnauthorized")
+}
+
 /// API errors that can occur during network requests.
 enum APIError: Error, LocalizedError {
     case invalidURL
@@ -152,17 +157,23 @@ class APIClient {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
-        // Add demo mode header for auth bypass
+        // Add demo mode headers for auth bypass
         if isDemoMode {
             request.setValue("true", forHTTPHeaderField: "X-Dev-Mode")
-        }
+            // Add member ID for demo mode (alithia@aboundfi.com)
+            request.setValue("000000000000000000000005", forHTTPHeaderField: "X-Member-Id")
+            // Use hardcoded church ID for demo mode
+            request.setValue("000000000000000000000003", forHTTPHeaderField: "X-Church-Id")
+        } else {
+            // Production mode: use stored church ID from Keychain
+            if let churchId = KeychainService.shared.churchId {
+                request.setValue(churchId, forHTTPHeaderField: "X-Church-Id")
+            }
 
-        // Add church ID header (hardcoded for development - Norwalk Baptist Church)
-        request.setValue("000000000000000000000003", forHTTPHeaderField: "X-Church-Id")
-
-        // Add auth token if available (for non-demo mode)
-        if let token = authToken, !isDemoMode {
-            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            // Add auth token if available
+            if let token = authToken ?? KeychainService.shared.accessToken {
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            }
         }
 
         // Add body if provided
@@ -207,6 +218,10 @@ class APIClient {
                     throw APIError.decodingFailed(error)
                 }
             case 401:
+                // Post notification for unauthorized - triggers logout
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: .apiUnauthorized, object: nil)
+                }
                 throw APIError.unauthorized
             case 404:
                 throw APIError.notFound

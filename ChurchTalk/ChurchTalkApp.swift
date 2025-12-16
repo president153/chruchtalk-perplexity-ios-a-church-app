@@ -2,7 +2,7 @@
 //  ChurchTalkApp.swift
 //  ChurchTalk
 //
-//  Main app entry point with splash screen and auth state routing
+//  Main app entry point with auth gate routing
 //
 
 import SwiftUI
@@ -13,45 +13,24 @@ struct ChurchTalkApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
     @StateObject private var authViewModel = AuthViewModel()
     @StateObject private var notificationService = NotificationService.shared
-    @State private var showSplash = true
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if showSplash {
-                    SplashView()
-                        .onAppear {
-                            // Show splash for 2 seconds
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
-                                withAnimation(.easeOut(duration: 0.3)) {
-                                    showSplash = false
-                                }
-                            }
-                        }
-                } else if authViewModel.isAuthenticated {
-                    if authViewModel.isPendingApproval {
-                        // User is waiting for church approval
-                        NavigationStack {
-                            PendingApprovalView()
-                                .environmentObject(authViewModel)
-                        }
-                    } else {
-                        // Fully authenticated - show main app
-                        MainTabView()
-                            .environmentObject(authViewModel)
-                            .task {
-                                // Request notification permission after login
-                                await requestNotificationPermission()
-                            }
+            AuthGate()
+                .environmentObject(authViewModel)
+                .task {
+                    // Request notification permission when app launches
+                    if authViewModel.isAuthenticated && !authViewModel.isPendingApproval {
+                        await requestNotificationPermission()
                     }
-                } else {
-                    // Not authenticated - show onboarding
-                    OnboardingView()
-                        .environmentObject(authViewModel)
                 }
-            }
-            .animation(.easeInOut(duration: 0.3), value: authViewModel.isAuthenticated)
-            .animation(.easeInOut(duration: 0.3), value: authViewModel.isPendingApproval)
+                .onChange(of: authViewModel.isAuthenticated) { _, isAuthenticated in
+                    if isAuthenticated && !authViewModel.isPendingApproval {
+                        Task {
+                            await requestNotificationPermission()
+                        }
+                    }
+                }
         }
     }
 
