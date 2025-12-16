@@ -296,7 +296,7 @@ struct FeeCalculation {
 /// Build URL for the giving web page
 struct GivingURLBuilder {
     /// Base URL for the giving page
-    static let baseURL = "https://give.churchtalk.ai"
+    static let baseURL = "https://give.churchtalk.ai/give"
 
     /// Build URL to open giving page in Safari
     /// - Parameters:
@@ -304,9 +304,12 @@ struct GivingURLBuilder {
     ///   - fundId: Optional pre-selected fund ID
     /// - Returns: URL to open in Safari
     static func buildURL(churchSlug: String, fundId: String? = nil) -> URL? {
-        var components = URLComponents(string: "\(baseURL)/\(churchSlug)")
+        var components = URLComponents(string: baseURL)
 
         var queryItems: [URLQueryItem] = []
+
+        // Add church slug as query parameter
+        queryItems.append(URLQueryItem(name: "church", value: churchSlug))
 
         // Add fund if specified
         if let fundId = fundId {
@@ -317,9 +320,7 @@ struct GivingURLBuilder {
         let returnURL = "churchtalk://giving/success"
         queryItems.append(URLQueryItem(name: "returnUrl", value: returnURL))
 
-        if !queryItems.isEmpty {
-            components?.queryItems = queryItems
-        }
+        components?.queryItems = queryItems
 
         return components?.url
     }
