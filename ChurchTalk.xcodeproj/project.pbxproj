@@ -7,7 +7,9 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0299873FB765AFBB7768EC66 /* GivingViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3656814F6A08D5608E02F5B7 /* GivingViewModel.swift */; };
 		098E26197A41D88921A02E5C /* StoryCircle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 96D60139807527ADF562839C /* StoryCircle.swift */; };
+		0D2FA8FA8FA367D5CEFF48C6 /* GivingAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = 29640D168EF773BAF1FB02C5 /* GivingAPI.swift */; };
 		1141F049430916B1B4BC6720 /* QuickActionsRow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 934782519720FDF9CB8AE93D /* QuickActionsRow.swift */; };
 		14039C2F2164D652264764A4 /* Events.swift in Sources */ = {isa = PBXBuildFile; fileRef = E895CD766F7F87D287D64763 /* Events.swift */; };
 		14D11E4214232715D785641D /* Colors.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971DBCCF4FA9EBCD3241D58B /* Colors.swift */; };
@@ -102,6 +104,7 @@
 		CA6663116829AEA8768A9DFD /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 17B6AA3261A69893417F7AD4 /* HomeView.swift */; };
 		CD8C93253E11B67DED69B616 /* CalendarService.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E27F52822F90C09CB8154FA /* CalendarService.swift */; };
 		CFD03EB72F4EF4CA433EA36B /* PrivacySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 591C4E27DA913B4F0BDA93BC /* PrivacySettingsView.swift */; };
+		D0CEF9F8A843B12E976FD635 /* Giving.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1EA3CC1071C7A9CBA7CE1DFC /* Giving.swift */; };
 		D3536C8FADF4E873195B8AD2 /* EventListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA09CDE8D988F8E7F9D510AB /* EventListView.swift */; };
 		D520233722DE6AFD2DEA417C /* ChurchProfileEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 202CB0F7978169151952679C /* ChurchProfileEditorView.swift */; };
 		D5DC10824D5016B3A40F8B1C /* EditProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 56426C9161F73FDD4AA1AF6E /* EditProfileView.swift */; };
@@ -118,6 +121,7 @@
 		1C0821D86C59DF553BD07449 /* AppDelegate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		1C3C9A210877306CD5CD8108 /* EmptyStateView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = EmptyStateView.swift; sourceTree = "<group>"; };
 		1E830B2C501423A19B81EE60 /* CodeInputField.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CodeInputField.swift; sourceTree = "<group>"; };
+		1EA3CC1071C7A9CBA7CE1DFC /* Giving.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = Giving.swift; sourceTree = "<group>"; };
 		202CB0F7978169151952679C /* ChurchProfileEditorView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChurchProfileEditorView.swift; sourceTree = "<group>"; };
 		209AE15FABB0E009CDEBB16D /* FamilyManagementView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = FamilyManagementView.swift; sourceTree = "<group>"; };
 		20FD792E6F350364B019CDD6 /* NotificationSettingsView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NotificationSettingsView.swift; sourceTree = "<group>"; };
@@ -126,9 +130,11 @@
 		250006F5C804D107456FCD09 /* StoriesRowView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StoriesRowView.swift; sourceTree = "<group>"; };
 		26023EFF4D5D9CCC3EAFDF47 /* LoadingSkeletons.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoadingSkeletons.swift; sourceTree = "<group>"; };
 		26782D04FB43965EF2001AD9 /* HomeHeaderView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeHeaderView.swift; sourceTree = "<group>"; };
+		29640D168EF773BAF1FB02C5 /* GivingAPI.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GivingAPI.swift; sourceTree = "<group>"; };
 		2A9184DC2E5905DD1FC4079D /* LoadingButton.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LoadingButton.swift; sourceTree = "<group>"; };
 		2D70A68C1765E22F49F459BA /* ChurchServiceTimesView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ChurchServiceTimesView.swift; sourceTree = "<group>"; };
 		339392BDF77172E3546F4753 /* ImageGalleryView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ImageGalleryView.swift; sourceTree = "<group>"; };
+		3656814F6A08D5608E02F5B7 /* GivingViewModel.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = GivingViewModel.swift; sourceTree = "<group>"; };
 		3E27F52822F90C09CB8154FA /* CalendarService.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CalendarService.swift; sourceTree = "<group>"; };
 		3E71A751ED97BD605FFDE854 /* PrayerModerationView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = PrayerModerationView.swift; sourceTree = "<group>"; };
 		3FE4DD86A4A4191FFFD9EA69 /* LogoView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LogoView.swift; sourceTree = "<group>"; };
@@ -363,6 +369,7 @@
 				E895CD766F7F87D287D64763 /* Events.swift */,
 				607AA6BFFCEE1A65A80D4DB4 /* Story.swift */,
 				8A32962AE6BEE98226D7F250 /* FundType.swift */,
+				1EA3CC1071C7A9CBA7CE1DFC /* Giving.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -371,6 +378,7 @@
 			isa = PBXGroup;
 			children = (
 				A1000008201AAAAA00000001 /* AuthViewModel.swift */,
+				3656814F6A08D5608E02F5B7 /* GivingViewModel.swift */,
 			);
 			path = ViewModels;
 			sourceTree = "<group>";
@@ -557,6 +565,7 @@
 				790E4A77C36BFFB0E772DCAB /* BulletinAPI.swift */,
 				F4B82F3FE05C7F9613092CD8 /* NotificationService.swift */,
 				AABBCC1FDEADBEEF0000000F /* KeychainService.swift */,
+				29640D168EF773BAF1FB02C5 /* GivingAPI.swift */,
 			);
 			path = Services;
 			sourceTree = "<group>";
@@ -763,6 +772,9 @@
 				62D4E33339B4BB1AAC56380F /* Story.swift in Sources */,
 				2D30DB12B1A8A34774907CF6 /* FundType.swift in Sources */,
 				638020FC991C2BDA9E2C8C39 /* AnalyticsAPI.swift in Sources */,
+				D0CEF9F8A843B12E976FD635 /* Giving.swift in Sources */,
+				0D2FA8FA8FA367D5CEFF48C6 /* GivingAPI.swift in Sources */,
+				0299873FB765AFBB7768EC66 /* GivingViewModel.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -903,12 +915,12 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "A Church App";
+				INFOPLIST_KEY_NSCalendarsUsageDescription = "ChurchTalk needs calendar access to add church events to your calendar with reminders.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_NSCalendarsUsageDescription = "ChurchTalk needs calendar access to add church events to your calendar with reminders.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
@@ -933,12 +945,12 @@
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = "A Church App";
+				INFOPLIST_KEY_NSCalendarsUsageDescription = "ChurchTalk needs calendar access to add church events to your calendar with reminders.";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPad = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
 				INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone = "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight";
-				INFOPLIST_KEY_NSCalendarsUsageDescription = "ChurchTalk needs calendar access to add church events to your calendar with reminders.";
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",

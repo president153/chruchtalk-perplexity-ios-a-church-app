@@ -28,11 +28,8 @@ final class GivingAPI {
 
     /// List all active funds for the church
     func listFunds() async throws -> [Fund] {
-        let response: [FundResponse] = try await APIClient.shared.request(
-            endpoint: "/giving/funds?active_only=true",
-            method: .get
-        )
-        return response.map { $0.toFund() }
+        let response: FundsListResponse = try await APIClient.shared.get("/giving/funds?active_only=true")
+        return response.funds.map { $0.toFund() }
     }
 
     // MARK: - My Donations
@@ -44,40 +41,28 @@ final class GivingAPI {
             endpoint += "&year=\(year)"
         }
 
-        let response: [DonationResponse] = try await APIClient.shared.request(
-            endpoint: endpoint,
-            method: .get
-        )
-        return response.map { $0.toDonation() }
+        let response: DonationsListResponse = try await APIClient.shared.get(endpoint)
+        return response.donations.map { $0.toDonation() }
     }
 
     // MARK: - My Recurring Givings
 
     /// Get my recurring giving subscriptions
     func getMyRecurringGivings() async throws -> [RecurringGiving] {
-        let response: [RecurringGivingResponse] = try await APIClient.shared.request(
-            endpoint: "/giving/recurring/my",
-            method: .get
-        )
-        return response.map { $0.toRecurringGiving() }
+        let response: RecurringGivingsListResponse = try await APIClient.shared.get("/giving/recurring/my")
+        return response.recurringGivings.map { $0.toRecurringGiving() }
     }
 
     /// Cancel a recurring giving
     func cancelRecurringGiving(id: String) async throws {
-        try await APIClient.shared.requestVoid(
-            endpoint: "/giving/recurring/\(id)",
-            method: .delete
-        )
+        try await APIClient.shared.delete("/giving/recurring/\(id)")
     }
 
     // MARK: - Tax Statements
 
     /// Get donor statement for a specific year
     func getDonorStatement(year: Int) async throws -> DonorStatement {
-        let response: DonorStatementResponse = try await APIClient.shared.request(
-            endpoint: "/giving/reports/statement/me/\(year)",
-            method: .get
-        )
+        let response: DonorStatementResponse = try await APIClient.shared.get("/giving/reports/statement/me/\(year)")
         return response.toDonorStatement()
     }
 
@@ -99,11 +84,26 @@ final class GivingAPI {
             endpoint += "?" + queryItems.joined(separator: "&")
         }
 
-        let response: GivingSummaryResponse = try await APIClient.shared.request(
-            endpoint: endpoint,
-            method: .get
-        )
+        let response: GivingSummaryResponse = try await APIClient.shared.get(endpoint)
         return response.toGivingSummary()
+    }
+}
+
+// MARK: - List Response Wrappers
+
+private struct FundsListResponse: Codable {
+    let funds: [FundResponse]
+}
+
+private struct DonationsListResponse: Codable {
+    let donations: [DonationResponse]
+}
+
+private struct RecurringGivingsListResponse: Codable {
+    let recurringGivings: [RecurringGivingResponse]
+
+    enum CodingKeys: String, CodingKey {
+        case recurringGivings = "recurring_givings"
     }
 }
 
