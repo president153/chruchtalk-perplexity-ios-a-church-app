@@ -176,4 +176,64 @@ class OutreachAPI {
     func deleteDoor(id: String) async throws {
         try await client.delete("/outreach/doors/\(id)")
     }
+
+    // MARK: - Weekly Assignments (Agentic AI)
+
+    /// Get current member's weekly street assignment
+    func getMyWeeklyAssignment() async throws -> WeeklyAssignment? {
+        return try await client.get("/outreach/my-assignment")
+    }
+
+    /// Accept a weekly assignment
+    func acceptAssignment(id: String) async throws -> Bool {
+        struct AcceptResponse: Codable {
+            let success: Bool
+            let message: String
+        }
+        let response: AcceptResponse = try await client.post("/outreach/assignments/\(id)/accept")
+        return response.success
+    }
+
+    /// Start working on a weekly assignment
+    func startAssignment(id: String) async throws -> Bool {
+        struct StartResponse: Codable {
+            let success: Bool
+            let message: String
+        }
+        let response: StartResponse = try await client.post("/outreach/assignments/\(id)/start")
+        return response.success
+    }
+
+    /// Complete a weekly assignment
+    func completeAssignment(id: String, doorsVisited: Int) async throws -> Bool {
+        struct CompleteRequest: Codable {
+            let doorsVisited: Int
+        }
+        struct CompleteResponse: Codable {
+            let success: Bool
+            let message: String
+        }
+        let request = CompleteRequest(doorsVisited: doorsVisited)
+        let response: CompleteResponse = try await client.post("/outreach/assignments/\(id)/complete", body: request)
+        return response.success
+    }
+
+    /// Decline a weekly assignment
+    func declineAssignment(id: String, reason: String? = nil) async throws -> Bool {
+        struct DeclineRequest: Codable {
+            let reason: String?
+        }
+        struct DeclineResponse: Codable {
+            let success: Bool
+            let message: String
+        }
+        let request = DeclineRequest(reason: reason)
+        let response: DeclineResponse = try await client.post("/outreach/assignments/\(id)/decline", body: request)
+        return response.success
+    }
+
+    /// Get weekly outreach statistics for the church
+    func getWeeklyStats() async throws -> WeeklyStats {
+        return try await client.get("/outreach/weekly-stats")
+    }
 }

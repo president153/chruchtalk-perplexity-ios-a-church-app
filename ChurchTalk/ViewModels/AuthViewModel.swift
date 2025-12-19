@@ -9,7 +9,7 @@ extension Notification.Name {
 @MainActor
 class AuthViewModel: ObservableObject {
     // MARK: - Auth State
-    @Published var isAuthenticated = true  // Auto-auth for development
+    @Published var isAuthenticated = false  // Start unauthenticated, restore from Keychain
     @Published var isEmailVerified = true
     @Published var isPendingApproval = false
 
@@ -155,8 +155,12 @@ class AuthViewModel: ObservableObject {
             // Store tokens securely in Keychain for later refresh
             KeychainService.shared.saveTokens(
                 accessToken: response.accessToken,
-                refreshToken: response.refreshToken
+                refreshToken: response.refreshToken,
+                idToken: response.idToken
             )
+
+            // Set token expiration for automatic refresh
+            TokenManager.shared.setTokenExpiration(expiresIn: response.expiresIn)
 
             // Map user response to User model
             user = User(
@@ -369,6 +373,9 @@ class AuthViewModel: ObservableObject {
         pendingChurchName = nil
         pendingMember = nil
         pendingVerificationEmail = nil
+
+        // Clear token manager state
+        TokenManager.shared.clearTokenState()
 
         // Clear stored tokens from Keychain
         APIClient.shared.authToken = nil

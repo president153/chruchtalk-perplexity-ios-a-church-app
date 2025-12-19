@@ -190,9 +190,10 @@ struct EditProfileView: View {
                         }
 
                         // Map Preview (like Apple Contacts)
-                        if addressCoordinate != nil {
-                            Map(coordinateRegion: $mapRegion, annotationItems: [AddressAnnotation(coordinate: addressCoordinate!)]) { item in
-                                MapMarker(coordinate: item.coordinate, tint: .churchTalkRed)
+                        if let coordinate = addressCoordinate {
+                            Map(position: .constant(.region(mapRegion))) {
+                                Marker("", coordinate: coordinate)
+                                    .tint(.churchTalkRed)
                             }
                             .frame(height: 150)
                             .cornerRadius(12)
@@ -341,7 +342,7 @@ struct EditProfileView: View {
             street = address.street
             city = address.city
             state = address.state
-            zipCode = address.zipCode
+            zipCode = address.zipCode ?? ""
             // Auto-geocode if address exists
             geocodeAddress()
         }
@@ -475,11 +476,6 @@ struct EditProfileView: View {
 }
 
 // MARK: - Supporting Types
-
-struct AddressAnnotation: Identifiable {
-    let id = UUID()
-    let coordinate: CLLocationCoordinate2D
-}
 
 struct MilestoneRow: View {
     let icon: String

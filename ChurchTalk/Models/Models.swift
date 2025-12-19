@@ -184,17 +184,40 @@ struct ChurchAddress: Codable {
     var street: String
     var city: String
     var state: String
-    var zipCode: String
-    var country: String = "USA"
+    var zipCode: String?
+    var country: String?
     var latitude: Double?
     var longitude: Double?
+
+    // Custom decoder to handle null values from API
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        street = try container.decodeIfPresent(String.self, forKey: .street) ?? ""
+        city = try container.decodeIfPresent(String.self, forKey: .city) ?? ""
+        state = try container.decodeIfPresent(String.self, forKey: .state) ?? ""
+        zipCode = try container.decodeIfPresent(String.self, forKey: .zipCode)
+        country = try container.decodeIfPresent(String.self, forKey: .country)
+        latitude = try container.decodeIfPresent(Double.self, forKey: .latitude)
+        longitude = try container.decodeIfPresent(Double.self, forKey: .longitude)
+    }
+
+    // Memberwise init for code usage
+    init(street: String, city: String, state: String, zipCode: String?, country: String? = "USA", latitude: Double? = nil, longitude: Double? = nil) {
+        self.street = street
+        self.city = city
+        self.state = state
+        self.zipCode = zipCode
+        self.country = country
+        self.latitude = latitude
+        self.longitude = longitude
+    }
 
     var formatted: String {
         var parts: [String] = []
         if !street.isEmpty { parts.append(street) }
         if !city.isEmpty { parts.append(city) }
         if !state.isEmpty { parts.append(state) }
-        if !zipCode.isEmpty { parts.append(zipCode) }
+        if let zip = zipCode, !zip.isEmpty { parts.append(zip) }
         return parts.joined(separator: ", ")
     }
 
@@ -368,7 +391,7 @@ struct Member: Identifiable, Codable, Hashable {
         id = try container.decode(String.self, forKey: .id)
         firstName = try container.decode(String.self, forKey: .firstName)
         lastName = try container.decode(String.self, forKey: .lastName)
-        email = try container.decode(String.self, forKey: .email)
+        email = try container.decodeIfPresent(String.self, forKey: .email) ?? ""
         phone = try container.decodeIfPresent(String.self, forKey: .phone)
         avatarUrl = try container.decodeIfPresent(String.self, forKey: .avatarUrl)
         churchId = try container.decodeIfPresent(String.self, forKey: .churchId)
@@ -796,6 +819,111 @@ enum DoorStatus: String, Codable {
         case .alreadyMember: return "blue"
         case .doNotContact: return "black"
         }
+    }
+}
+
+// MARK: - Weekly Assignment (Agentic AI)
+
+enum WeeklyAssignmentStatus: String, Codable {
+    case pending
+    case accepted
+    case inProgress = "in_progress"
+    case completed
+    case declined
+
+    var displayName: String {
+        switch self {
+        case .pending: return "Pending"
+        case .accepted: return "Accepted"
+        case .inProgress: return "In Progress"
+        case .completed: return "Completed"
+        case .declined: return "Declined"
+        }
+    }
+}
+
+struct WeeklyAssignment: Identifiable, Decodable {
+    let id: String
+    let churchId: String
+    let memberId: String
+    let memberName: String
+    let streetId: String
+    let streetName: String
+    let territoryId: String
+    let territoryName: String
+    let doorCount: Int
+    var doorsVisited: Int
+    let weekStart: Date
+    let weekEnd: Date
+    var status: WeeklyAssignmentStatus
+    let assignedAt: Date
+    var acceptedAt: Date?
+    var startedAt: Date?
+    var completedAt: Date?
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let idValue = try? container.decode(String.self, forKey: .id) {
+            id = idValue
+        } else {
+            id = try container.decode(String.self, forKey: ._id)
+        }
+        churchId = try container.decode(String.self, forKey: .churchId)
+        memberId = try container.decode(String.self, forKey: .memberId)
+        memberName = try container.decodeIfPresent(String.self, forKey: .memberName) ?? "Member"
+        streetId = try container.decode(String.self, forKey: .streetId)
+        streetName = try container.decode(String.self, forKey: .streetName)
+        territoryId = try container.decode(String.self, forKey: .territoryId)
+        territoryName = try container.decode(String.self, forKey: .territoryName)
+        doorCount = try container.decodeIfPresent(Int.self, forKey: .doorCount) ?? 0
+        doorsVisited = try container.decodeIfPresent(Int.self, forKey: .doorsVisited) ?? 0
+        weekStart = try container.decode(Date.self, forKey: .weekStart)
+        weekEnd = try container.decode(Date.self, forKey: .weekEnd)
+        status = try container.decodeIfPresent(WeeklyAssignmentStatus.self, forKey: .status) ?? .pending
+        assignedAt = try container.decodeIfPresent(Date.self, forKey: .assignedAt) ?? Date()
+        acceptedAt = try container.decodeIfPresent(Date.self, forKey: .acceptedAt)
+        startedAt = try container.decodeIfPresent(Date.self, forKey: .startedAt)
+        completedAt = try container.decodeIfPresent(Date.self, forKey: .completedAt)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, _id, churchId, memberId, memberName, streetId, streetName
+        case territoryId, territoryName, doorCount, doorsVisited
+        case weekStart, weekEnd, status, assignedAt, acceptedAt, startedAt, completedAt
+    }
+
+    var progressPercent: Double {
+        guard doorCount > 0 else { return 0 }
+        return Double(doorsVisited) / Double(doorCount) * 100
+    }
+
+    var isActive: Bool {
+        let now = Date()
+        return now >= weekStart && now <= weekEnd
+    }
+
+    var daysRemaining: Int {
+        let now = Date()
+        let calendar = Calendar.current
+        return max(0, calendar.dateComponents([.day], from: now, to: weekEnd).day ?? 0)
+    }
+}
+
+struct WeeklyStats: Decodable {
+    let weekStart: String
+    let weekEnd: String
+    let totalAssignments: Int
+    let pending: Int
+    let accepted: Int
+    let inProgress: Int
+    let completed: Int
+    let declined: Int
+    let totalDoorsAssigned: Int
+    let totalDoorsVisited: Int
+
+    var churchCompletionPercent: Double {
+        guard totalDoorsAssigned > 0 else { return 0 }
+        return Double(totalDoorsVisited) / Double(totalDoorsAssigned) * 100
     }
 }
 

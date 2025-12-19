@@ -215,6 +215,16 @@ struct ProfileView: View {
     private func loadStats() async {
         isLoadingStats = true
 
+        // Load outreach stats (doors knocked)
+        do {
+            let outreachStats = try await OutreachAPI.shared.getStats()
+            await MainActor.run {
+                doorsKnocked = outreachStats.doorsKnocked
+            }
+        } catch {
+            print("Failed to load outreach stats: \(error)")
+        }
+
         // Load souls count
         do {
             let souls = try await SoulsAPI.shared.getSouls(mine: true, limit: 1000)
@@ -234,9 +244,6 @@ struct ProfileView: View {
         } catch {
             print("Failed to load prayers count: \(error)")
         }
-
-        // Doors knocked would come from outreach API (not available yet)
-        // For now, keep as 0 or could calculate from local data if available
 
         await MainActor.run {
             isLoadingStats = false

@@ -118,8 +118,7 @@ struct EventCalendarView: View {
     }
 
     private func generateDaysInMonth() -> [Date?] {
-        guard let monthInterval = calendar.dateInterval(of: .month, for: currentMonth),
-              let firstWeek = calendar.dateInterval(of: .weekOfMonth, for: monthInterval.start) else {
+        guard let monthInterval = calendar.dateInterval(of: .month, for: currentMonth) else {
             return []
         }
 

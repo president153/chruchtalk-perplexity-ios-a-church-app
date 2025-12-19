@@ -41,8 +41,8 @@ class CalendarService: ObservableObject {
         notes: String?,
         isAllDay: Bool = false
     ) async throws -> String {
-        // Check authorization
-        if authorizationStatus != .fullAccess && authorizationStatus != .authorized {
+        // Check authorization (fullAccess is the new status in iOS 17+)
+        if authorizationStatus != .fullAccess {
             let granted = await requestAccess()
             if !granted {
                 throw CalendarError.accessDenied

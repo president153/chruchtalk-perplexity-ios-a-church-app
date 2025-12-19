@@ -20,7 +20,7 @@ struct CodeInputField: View {
                 .frame(width: 1, height: 1)
                 .opacity(0.01)
                 .focused($isFocused)
-                .onChange(of: code) { newValue in
+                .onChange(of: code) { _, newValue in
                     // Filter to only allow digits and limit to 6
                     let filtered = newValue.filter { $0.isNumber }
                     if filtered.count > 6 {

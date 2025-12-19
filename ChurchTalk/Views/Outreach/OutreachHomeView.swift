@@ -8,6 +8,12 @@ struct OutreachHomeView: View {
     @State private var showMySouls = false
     @State private var showSRMDashboard = false
 
+    // Weekly Assignment (Agentic AI)
+    @State private var weeklyAssignment: WeeklyAssignment?
+    @State private var isLoadingAssignment = true
+    @State private var isAcceptingAssignment = false
+    @State private var isStartingAssignment = false
+
     // Stats from API
     @State private var doorsKnocked: Int = 0
     @State private var soulsAdded: Int = 0
@@ -19,6 +25,24 @@ struct OutreachHomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 20) {
+                    // Weekly Assignment Card (Agentic AI)
+                    if isLoadingAssignment {
+                        WeeklyAssignmentLoadingCard()
+                    } else if let assignment = weeklyAssignment {
+                        WeeklyAssignmentCard(
+                            assignment: assignment,
+                            isAccepting: isAcceptingAssignment,
+                            isStarting: isStartingAssignment,
+                            onAccept: { await acceptAssignment() },
+                            onStart: { await startAssignment() },
+                            onViewStreet: {
+                                // Navigate to street detail
+                            }
+                        )
+                    } else {
+                        NoAssignmentCard()
+                    }
+
                     // My Personal Stats Section
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
@@ -145,8 +169,67 @@ struct OutreachHomeView: View {
 
     private func loadData() async {
         await withTaskGroup(of: Void.self) { group in
+            group.addTask { await loadWeeklyAssignment() }
             group.addTask { await loadStats() }
             group.addTask { await loadTerritories() }
+        }
+    }
+
+    private func loadWeeklyAssignment() async {
+        await MainActor.run {
+            isLoadingAssignment = true
+        }
+
+        do {
+            let assignment = try await OutreachAPI.shared.getMyWeeklyAssignment()
+            await MainActor.run {
+                weeklyAssignment = assignment
+                isLoadingAssignment = false
+            }
+        } catch {
+            print("Failed to load weekly assignment: \(error)")
+            await MainActor.run {
+                weeklyAssignment = nil
+                isLoadingAssignment = false
+            }
+        }
+    }
+
+    private func acceptAssignment() async {
+        guard let assignment = weeklyAssignment else { return }
+
+        await MainActor.run {
+            isAcceptingAssignment = true
+        }
+
+        do {
+            _ = try await OutreachAPI.shared.acceptAssignment(id: assignment.id)
+            await loadWeeklyAssignment()
+        } catch {
+            print("Failed to accept assignment: \(error)")
+        }
+
+        await MainActor.run {
+            isAcceptingAssignment = false
+        }
+    }
+
+    private func startAssignment() async {
+        guard let assignment = weeklyAssignment else { return }
+
+        await MainActor.run {
+            isStartingAssignment = true
+        }
+
+        do {
+            _ = try await OutreachAPI.shared.startAssignment(id: assignment.id)
+            await loadWeeklyAssignment()
+        } catch {
+            print("Failed to start assignment: \(error)")
+        }
+
+        await MainActor.run {
+            isStartingAssignment = false
         }
     }
 
@@ -340,6 +423,219 @@ struct TerritoryCard: View {
                     }
                 }
                 .frame(height: 6)
+            }
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, y: 2)
+        .padding(.horizontal)
+    }
+}
+
+// MARK: - Weekly Assignment Cards
+
+struct WeeklyAssignmentLoadingCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "calendar.badge.clock")
+                    .foregroundColor(.churchTalkRed)
+                Text("This Week's Assignment")
+                    .font(.headline)
+                Spacer()
+            }
+
+            HStack {
+                Spacer()
+                ProgressView()
+                Spacer()
+            }
+            .padding(.vertical, 20)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, y: 2)
+        .padding(.horizontal)
+    }
+}
+
+struct NoAssignmentCard: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: "calendar.badge.clock")
+                    .foregroundColor(.churchTalkRed)
+                Text("This Week's Assignment")
+                    .font(.headline)
+                Spacer()
+            }
+
+            VStack(spacing: 8) {
+                Image(systemName: "checkmark.circle.fill")
+                    .font(.title)
+                    .foregroundColor(.green)
+                Text("No assignment this week")
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                Text("Check back Thursday for next week's street")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 12)
+        }
+        .padding()
+        .background(Color(.systemBackground))
+        .cornerRadius(12)
+        .shadow(color: Color.black.opacity(0.05), radius: 5, y: 2)
+        .padding(.horizontal)
+    }
+}
+
+struct WeeklyAssignmentCard: View {
+    let assignment: WeeklyAssignment
+    let isAccepting: Bool
+    let isStarting: Bool
+    let onAccept: () async -> Void
+    let onStart: () async -> Void
+    let onViewStreet: () -> Void
+
+    var statusColor: Color {
+        switch assignment.status {
+        case .pending: return .orange
+        case .accepted: return .blue
+        case .inProgress: return .green
+        case .completed: return .gray
+        case .declined: return .red
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Header
+            HStack {
+                Image(systemName: "calendar.badge.clock")
+                    .foregroundColor(.churchTalkRed)
+                Text("This Week's Assignment")
+                    .font(.headline)
+                Spacer()
+                Text("\(assignment.daysRemaining) days left")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
+            // Street Info
+            VStack(alignment: .leading, spacing: 4) {
+                Text(assignment.streetName)
+                    .font(.title3)
+                    .fontWeight(.semibold)
+
+                Text(assignment.territoryName)
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+            }
+
+            // Progress
+            VStack(alignment: .leading, spacing: 4) {
+                HStack {
+                    Text("\(assignment.doorsVisited)/\(assignment.doorCount) doors")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(Int(assignment.progressPercent))%")
+                        .font(.caption)
+                        .fontWeight(.medium)
+                }
+
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(height: 6)
+                            .cornerRadius(3)
+
+                        Rectangle()
+                            .fill(statusColor)
+                            .frame(width: geometry.size.width * assignment.progressPercent / 100, height: 6)
+                            .cornerRadius(3)
+                    }
+                }
+                .frame(height: 6)
+            }
+
+            // Status Badge
+            HStack {
+                Text(assignment.status.displayName)
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(statusColor)
+                    .cornerRadius(4)
+
+                Spacer()
+            }
+
+            // Action Buttons
+            HStack(spacing: 12) {
+                if assignment.status == .pending {
+                    Button(action: { Task { await onAccept() } }) {
+                        HStack {
+                            if isAccepting {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Image(systemName: "checkmark.circle.fill")
+                                Text("Accept")
+                            }
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.green)
+                        .cornerRadius(8)
+                    }
+                    .disabled(isAccepting)
+                } else if assignment.status == .accepted {
+                    Button(action: { Task { await onStart() } }) {
+                        HStack {
+                            if isStarting {
+                                ProgressView()
+                                    .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            } else {
+                                Image(systemName: "play.fill")
+                                Text("Start Outreach")
+                            }
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.churchTalkRed)
+                        .cornerRadius(8)
+                    }
+                    .disabled(isStarting)
+                } else if assignment.status == .inProgress {
+                    Button(action: onViewStreet) {
+                        HStack {
+                            Image(systemName: "map.fill")
+                            Text("View Street")
+                        }
+                        .font(.subheadline)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(Color.churchTalkRed)
+                        .cornerRadius(8)
+                    }
+                }
             }
         }
         .padding()

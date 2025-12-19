@@ -14,6 +14,7 @@ struct HomeView: View {
     @State private var showEventsSheet = false
     @State private var posts: [BulletinPost] = []
     @State private var events: [ChurchEvent] = []
+    @State private var featuredMedia: FeaturedMedia?
     @State private var isLoading = true
     @State private var loadError: String?
     @State private var selectedPost: BulletinPost?
@@ -48,8 +49,10 @@ struct HomeView: View {
                     // Quick Actions
                     QuickActionsRow()
 
-                    // Featured/Live Content
-                    FeaturedContentCard()
+                    // Featured/Live Content (only show if available)
+                    if let media = featuredMedia {
+                        FeaturedContentCard(media: media)
+                    }
 
                     // Upcoming Events
                     if !events.isEmpty {
@@ -140,9 +143,10 @@ struct HomeView: View {
         isLoading = true
         loadError = nil
 
-        // Fetch posts and events concurrently
+        // Fetch posts, events, and featured media concurrently
         async let postsTask = BulletinAPI.shared.getPosts(limit: 10)
         async let eventsTask = EventsAPI.shared.getUpcomingEvents(limit: 5)
+        async let mediaTask = MediaAPI.shared.getFeaturedMedia()
 
         do {
             let fetchedPosts = try await postsTask
@@ -167,6 +171,17 @@ struct HomeView: View {
             // Don't set error - events are not critical
         }
 
+        // Featured media is optional - don't fail if it doesn't load
+        do {
+            let fetchedMedia = try await mediaTask
+            await MainActor.run {
+                featuredMedia = fetchedMedia
+            }
+        } catch {
+            print("Failed to fetch featured media: \(error)")
+            // Don't set error - featured media is not critical
+        }
+
         await MainActor.run {
             isLoading = false
         }
@@ -174,24 +189,22 @@ struct HomeView: View {
 }
 
 struct FeaturedContentCard: View {
-    let isLive = false
-    let featuredVideoTitle = "Sunday Service - December 10"
-    let featuredVideoThumbnail: String? = nil
+    let media: FeaturedMedia
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            if isLive {
+            if media.isLive {
                 HStack(spacing: 6) {
                     Circle().fill(Color.red).frame(width: 8, height: 8)
                     Text("LIVE NOW").font(.caption).fontWeight(.bold).foregroundColor(.red)
-                    Text("Sunday Service").font(.caption).foregroundColor(.secondary)
+                    Text(media.title).font(.caption).foregroundColor(.secondary).lineLimit(1)
                 }
                 .padding(.horizontal)
             }
 
-            Button(action: {}) {
+            Button(action: openMedia) {
                 ZStack {
-                    if let thumbnailUrl = featuredVideoThumbnail, let url = URL(string: thumbnailUrl) {
+                    if let thumbnailUrl = media.thumbnailUrl, let url = URL(string: thumbnailUrl) {
                         AsyncImage(url: url) { image in
                             image.resizable().aspectRatio(16/9, contentMode: .fill)
                         } placeholder: { placeholderView }
@@ -203,11 +216,30 @@ struct FeaturedContentCard: View {
                         .fill(.ultraThinMaterial)
                         .frame(width: 60, height: 60)
                         .overlay(
-                            Image(systemName: "play.fill")
+                            Image(systemName: media.isLive ? "antenna.radiowaves.left.and.right" : "play.fill")
                                 .font(.title2)
                                 .foregroundColor(.white)
-                                .offset(x: 2)
+                                .offset(x: media.isLive ? 0 : 2)
                         )
+
+                    // Duration badge (if not live)
+                    if !media.isLive, let duration = media.formattedDuration {
+                        VStack {
+                            Spacer()
+                            HStack {
+                                Spacer()
+                                Text(duration)
+                                    .font(.caption2)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 2)
+                                    .background(Color.black.opacity(0.7))
+                                    .cornerRadius(4)
+                                    .padding(8)
+                            }
+                        }
+                    }
                 }
                 .frame(height: 180)
                 .cornerRadius(12)
@@ -216,11 +248,16 @@ struct FeaturedContentCard: View {
             .buttonStyle(ScaleButtonStyle())
 
             VStack(alignment: .leading, spacing: 4) {
-                Text(featuredVideoTitle).font(.subheadline).fontWeight(.medium)
-                Text("Watch the latest message").font(.caption).foregroundColor(.secondary)
+                Text(media.title).font(.subheadline).fontWeight(.medium).lineLimit(2)
+                Text(media.description ?? "Watch the latest message").font(.caption).foregroundColor(.secondary).lineLimit(1)
             }
             .padding(.horizontal)
         }
+    }
+
+    private func openMedia() {
+        guard let url = media.mediaURL else { return }
+        UIApplication.shared.open(url)
     }
 
     private var placeholderView: some View {
@@ -231,10 +268,10 @@ struct FeaturedContentCard: View {
                 endPoint: .bottomTrailing
             )
             VStack(spacing: 8) {
-                Image(systemName: "play.rectangle.fill")
+                Image(systemName: media.isLive ? "antenna.radiowaves.left.and.right" : "play.rectangle.fill")
                     .font(.system(size: 40))
                     .foregroundColor(.white.opacity(0.9))
-                Text("Watch Latest Message")
+                Text(media.isLive ? "Watch Live" : "Watch Latest Message")
                     .font(.subheadline)
                     .fontWeight(.medium)
                     .foregroundColor(.white)

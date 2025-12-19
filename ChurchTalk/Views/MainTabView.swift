@@ -12,15 +12,17 @@ struct MainTabView: View {
         Group {
             switch selectedTab {
             case 0:
-                HomeView()
+                WeeklyFocusView()
             case 1:
-                ConnectTabView()
+                HomeView()
             case 2:
-                ServeTabView()
+                ConnectTabView()
             case 3:
+                ServeTabView()
+            case 4:
                 ProfileTabView(isAdmin: isAdmin)
             default:
-                HomeView()
+                WeeklyFocusView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -53,6 +55,7 @@ struct FloatingTabBar: View {
     @Binding var selectedTab: Int
 
     let tabs: [(icon: String, selectedIcon: String, title: String)] = [
+        ("sparkles", "sparkles", "Focus"),
         ("house", "house.fill", "Home"),
         ("bubble.left.and.bubble.right", "bubble.left.and.bubble.right.fill", "Connect"),
         ("hands.clap", "hands.clap.fill", "Serve"),

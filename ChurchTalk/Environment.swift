@@ -31,11 +31,11 @@ enum AppEnvironment: String {
     var isDemoModeEnabled: Bool {
         switch self {
         case .development:
-            return true  // Allow bypass during development
+            return false  // Use real auth
         case .staging:
-            return true  // Keep enabled for TestFlight testing
+            return false  // Use real auth
         case .production:
-            return false  // Enforce authentication in production
+            return false  // Use real auth
         }
     }
 

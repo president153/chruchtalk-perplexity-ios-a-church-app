@@ -54,65 +54,15 @@ struct EventsListSection: View {
     @State private var selectedDate = Date()
     @State private var selectedEvent: ChurchEvent? = nil
 
+    // Backend data state
+    @State private var events: [ChurchEvent] = []
+    @State private var isLoading = true
+    @State private var errorMessage: String?
+
     enum EventViewMode: String, CaseIterable {
         case list = "List"
         case calendar = "Calendar"
     }
-
-    // Demo events
-    let events: [ChurchEvent] = [
-        ChurchEvent(
-            id: "1",
-            churchId: "1",
-            title: "Christmas Eve Service",
-            description: "Join us for a special candlelight service",
-            startDate: Date().addingTimeInterval(86400 * 11),
-            isAllDay: false,
-            isVirtual: false,
-            requiresRegistration: true,
-            currentRegistrations: 156,
-            category: .worship,
-            tags: ["christmas"],
-            volunteerRoles: [],
-            createdAt: Date(),
-            isPublished: true,
-            isFeatured: true,
-        ),
-        ChurchEvent(
-            id: "2",
-            churchId: "1",
-            title: "Youth Night",
-            description: "Games and fellowship",
-            startDate: Date().addingTimeInterval(86400 * 2),
-            isAllDay: false,
-            isVirtual: false,
-            requiresRegistration: false,
-            currentRegistrations: 0,
-            category: .youth,
-            tags: [],
-            volunteerRoles: [],
-            createdAt: Date(),
-            isPublished: true,
-            isFeatured: false,
-        ),
-        ChurchEvent(
-            id: "3",
-            churchId: "1",
-            title: "Community Outreach",
-            description: "Serving our neighborhood",
-            startDate: Date().addingTimeInterval(86400 * 7),
-            isAllDay: false,
-            isVirtual: false,
-            requiresRegistration: true,
-            currentRegistrations: 24,
-            category: .outreach,
-            tags: [],
-            volunteerRoles: [],
-            createdAt: Date(),
-            isPublished: true,
-            isFeatured: false,
-        )
-    ]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -150,25 +100,90 @@ struct EventsListSection: View {
             .padding(.horizontal)
             .padding(.bottom, 8)
 
-            // Events List or Calendar
-            if viewMode == .list {
-                List {
-                    ForEach(filteredEvents) { event in
-                        NavigationLink(destination: EventDetailView(event: event)) {
-                            EventRowView(event: event)
+            // Content based on state
+            if isLoading {
+                VStack {
+                    Spacer()
+                    ProgressView()
+                    Spacer()
+                }
+            } else if let error = errorMessage {
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "wifi.exclamationmark")
+                        .font(.largeTitle)
+                        .foregroundColor(.orange)
+                    Text(error)
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Button("Retry") {
+                        Task { await loadEvents() }
+                    }
+                    .buttonStyle(.bordered)
+                    Spacer()
+                }
+            } else if events.isEmpty {
+                VStack(spacing: 12) {
+                    Spacer()
+                    Image(systemName: "calendar.badge.exclamationmark")
+                        .font(.largeTitle)
+                        .foregroundColor(.secondary)
+                    Text("No events scheduled")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    Text("Check back later for upcoming events")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+            } else {
+                // Events List or Calendar
+                if viewMode == .list {
+                    List {
+                        ForEach(filteredEvents) { event in
+                            NavigationLink(destination: EventDetailView(event: event)) {
+                                EventRowView(event: event)
+                            }
                         }
                     }
-                }
-                .listStyle(PlainListStyle())
-            } else {
-                // Calendar view
-                EventCalendarView(
-                    events: filteredEvents,
-                    selectedDate: $selectedDate,
-                    onEventTap: { event in
-                        selectedEvent = event
+                    .listStyle(PlainListStyle())
+                    .refreshable {
+                        await loadEvents()
                     }
-                )
+                } else {
+                    // Calendar view
+                    EventCalendarView(
+                        events: filteredEvents,
+                        selectedDate: $selectedDate,
+                        onEventTap: { event in
+                            selectedEvent = event
+                        }
+                    )
+                }
+            }
+        }
+        .task {
+            await loadEvents()
+        }
+    }
+
+    private func loadEvents() async {
+        await MainActor.run {
+            isLoading = true
+            errorMessage = nil
+        }
+
+        do {
+            let fetchedEvents = try await EventsAPI.shared.getEvents()
+            await MainActor.run {
+                events = fetchedEvents
+                isLoading = false
+            }
+        } catch {
+            print("Failed to load events: \(error)")
+            await MainActor.run {
+                errorMessage = "Failed to load events"
+                isLoading = false
             }
         }
     }
@@ -269,23 +284,9 @@ struct EventRowView: View {
 }
 
 struct MyCommitmentsSection: View {
-    // Demo volunteer commitments
-    let commitments = [
-        VolunteerCommitment(
-            id: "1",
-            eventTitle: "Sunday Service",
-            role: "Greeter",
-            date: Date().addingTimeInterval(86400 * 3),
-            status: .confirmed
-        ),
-        VolunteerCommitment(
-            id: "2",
-            eventTitle: "Youth Night",
-            role: "Small Group Leader",
-            date: Date().addingTimeInterval(86400 * 2),
-            status: .pending
-        )
-    ]
+    // Empty array - backend endpoint for user registrations not yet available
+    // Future: Wire to GET /events/my-registrations when endpoint is added
+    let commitments: [VolunteerCommitment] = []
 
     var body: some View {
         if commitments.isEmpty {

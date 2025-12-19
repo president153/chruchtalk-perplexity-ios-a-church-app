@@ -14,6 +14,11 @@ struct ChurchTalkApp: App {
     @StateObject private var authViewModel = AuthViewModel()
     @StateObject private var notificationService = NotificationService.shared
 
+    init() {
+        // Initialize crash reporting
+        CrashReporting.shared.configure()
+    }
+
     var body: some Scene {
         WindowGroup {
             AuthGate()

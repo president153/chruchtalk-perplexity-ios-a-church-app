@@ -257,8 +257,8 @@ struct EventRegistrationSheet: View {
 
     private func handleCalendarAccess(granted: Bool, error: Error?, eventStore: EKEventStore) {
         DispatchQueue.main.async {
-            if let error = error {
-                print("Calendar access error: \(error)")
+            if let error {
+                print("Calendar access error: \(error.localizedDescription)")
                 calendarAddStatus = .failed
                 calendarAlertMessage = "Failed to access calendar: \(error.localizedDescription)"
                 showCalendarAlert = true
