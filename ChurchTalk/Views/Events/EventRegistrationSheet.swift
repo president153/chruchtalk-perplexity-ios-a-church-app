@@ -1,4 +1,5 @@
 import SwiftUI
+import EventKit
 
 struct EventRegistrationSheet: View {
     let event: ChurchEvent
@@ -8,7 +9,17 @@ struct EventRegistrationSheet: View {
     @State private var notes = ""
     @State private var isSubmitting = false
     @State private var showConfirmation = false
+    @State private var calendarAddStatus: CalendarAddStatus = .idle
+    @State private var showCalendarAlert = false
+    @State private var calendarAlertMessage = ""
     @Environment(\.dismiss) private var dismiss
+
+    private enum CalendarAddStatus {
+        case idle
+        case adding
+        case added
+        case failed
+    }
 
     var body: some View {
         NavigationStack {
@@ -177,14 +188,33 @@ struct EventRegistrationSheet: View {
 
             VStack(spacing: 12) {
                 Button {
-                    // TODO: Add to calendar
+                    addToCalendar()
                 } label: {
-                    Label("Add to Calendar", systemImage: "calendar.badge.plus")
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        .background(Color(.secondarySystemBackground))
-                        .cornerRadius(12)
+                    HStack {
+                        switch calendarAddStatus {
+                        case .idle:
+                            Image(systemName: "calendar.badge.plus")
+                            Text("Add to Calendar")
+                        case .adding:
+                            ProgressView()
+                                .scaleEffect(0.8)
+                            Text("Adding...")
+                        case .added:
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.amenGreen)
+                            Text("Added to Calendar")
+                        case .failed:
+                            Image(systemName: "exclamationmark.circle")
+                                .foregroundColor(.orange)
+                            Text("Try Again")
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(calendarAddStatus == .added ? Color.amenGreen.opacity(0.1) : Color(.secondarySystemBackground))
+                    .cornerRadius(12)
                 }
+                .disabled(calendarAddStatus == .adding || calendarAddStatus == .added)
 
                 Button {
                     onComplete(true)
@@ -201,6 +231,89 @@ struct EventRegistrationSheet: View {
             .padding()
         }
         .padding()
+        .alert("Calendar", isPresented: $showCalendarAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(calendarAlertMessage)
+        }
+    }
+
+    private func addToCalendar() {
+        calendarAddStatus = .adding
+
+        let eventStore = EKEventStore()
+
+        // Request calendar access
+        if #available(iOS 17.0, *) {
+            eventStore.requestWriteOnlyAccessToEvents { granted, error in
+                handleCalendarAccess(granted: granted, error: error, eventStore: eventStore)
+            }
+        } else {
+            eventStore.requestAccess(to: .event) { granted, error in
+                handleCalendarAccess(granted: granted, error: error, eventStore: eventStore)
+            }
+        }
+    }
+
+    private func handleCalendarAccess(granted: Bool, error: Error?, eventStore: EKEventStore) {
+        DispatchQueue.main.async {
+            if let error = error {
+                print("Calendar access error: \(error)")
+                calendarAddStatus = .failed
+                calendarAlertMessage = "Failed to access calendar: \(error.localizedDescription)"
+                showCalendarAlert = true
+                return
+            }
+
+            guard granted else {
+                calendarAddStatus = .failed
+                calendarAlertMessage = "Calendar access was denied. Please enable calendar access in Settings to add events."
+                showCalendarAlert = true
+                return
+            }
+
+            // Create calendar event
+            let calendarEvent = EKEvent(eventStore: eventStore)
+            calendarEvent.title = event.title
+            calendarEvent.startDate = event.startDate
+            calendarEvent.endDate = event.endDate ?? event.startDate.addingTimeInterval(3600) // Default 1 hour
+            calendarEvent.notes = event.description
+
+            // Add location if available
+            if let location = event.location {
+                calendarEvent.location = location.name
+                if let address = location.address {
+                    calendarEvent.location = "\(location.name), \(address)"
+                }
+            }
+
+            // Add reminder 1 day before
+            let alarm = EKAlarm(relativeOffset: -86400) // 24 hours before
+            calendarEvent.addAlarm(alarm)
+
+            // Add reminder 1 hour before
+            let hourAlarm = EKAlarm(relativeOffset: -3600) // 1 hour before
+            calendarEvent.addAlarm(hourAlarm)
+
+            calendarEvent.calendar = eventStore.defaultCalendarForNewEvents
+
+            do {
+                try eventStore.save(calendarEvent, span: .thisEvent)
+                calendarAddStatus = .added
+
+                // Success haptic
+                let generator = UINotificationFeedbackGenerator()
+                generator.notificationOccurred(.success)
+
+                calendarAlertMessage = "Event has been added to your calendar with reminders."
+                showCalendarAlert = true
+            } catch {
+                print("Failed to save calendar event: \(error)")
+                calendarAddStatus = .failed
+                calendarAlertMessage = "Failed to add event to calendar: \(error.localizedDescription)"
+                showCalendarAlert = true
+            }
+        }
     }
 
     private func submitRegistration() {

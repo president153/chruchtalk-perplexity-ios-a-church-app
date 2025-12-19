@@ -27,15 +27,15 @@ enum AppEnvironment: String {
     }
 
     /// Whether demo mode (auth bypass) is enabled
-    /// Set to false for production when authentication is ready
+    /// Set to false for production to enforce authentication
     var isDemoModeEnabled: Bool {
         switch self {
         case .development:
-            return true
+            return true  // Allow bypass during development
         case .staging:
             return true  // Keep enabled for TestFlight testing
         case .production:
-            return true  // TODO: Set to false when authentication is ready
+            return false  // Enforce authentication in production
         }
     }
 
