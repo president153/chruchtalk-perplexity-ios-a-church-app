@@ -966,3 +966,248 @@ struct PrayerRequest: Identifiable, Codable {
     }
 }
 
+// MARK: - 52-Week Sermon System
+
+/// Church's annual vision that guides all sermons
+struct ChurchVision: Identifiable, Codable {
+    let id: String
+    let churchId: String
+    let year: Int
+    let title: String                    // "Year of Breakthrough"
+    var description: String?
+    var keyThemes: [String]              // ["Faith", "Prayer", "Community"]
+    var quarterlyGoals: [QuarterlyGoal]?
+    let createdAt: Date
+    var updatedAt: Date?
+}
+
+struct QuarterlyGoal: Identifiable, Codable {
+    let id: String
+    let quarter: Int                     // 1, 2, 3, 4
+    let theme: String                    // "Foundation of Faith"
+    var goals: [String]                  // ["50 souls saved", "100 baptisms"]
+    var description: String?
+}
+
+/// Weekly sermon from the pastor
+struct Sermon: Identifiable, Codable {
+    let id: String
+    let churchId: String
+    let weekNumber: Int                  // 1-52
+    let year: Int
+    let title: String                    // "Walking by Faith"
+    let date: Date                       // Sunday's date
+
+    // Core content
+    var description: String?
+    var mainScripture: Scripture         // Primary Bible passage
+    var additionalScriptures: [Scripture]?
+    var keyPoints: [String]              // Bullet points from sermon
+    var quotes: [SermonQuote]?           // Memorable quotes
+
+    // Media
+    var videoUrl: String?                // Sermon recording
+    var audioUrl: String?
+    var thumbnailUrl: String?
+
+    // AI-extracted themes (for context building)
+    var extractedThemes: [String]?       // AI-identified themes
+    var applicationPoints: [String]?     // How to apply this sermon
+
+    // Connection to vision
+    var visionConnection: String?        // How this sermon ties to church vision
+    var buildsOnWeeks: [Int]?            // Previous weeks this builds on
+
+    // Metadata
+    let preacherName: String
+    var preacherId: String?
+    let createdAt: Date
+    var updatedAt: Date?
+
+    /// Get week display (e.g., "Week 5 of 52")
+    var weekDisplay: String {
+        "Week \(weekNumber) of 52"
+    }
+}
+
+struct Scripture: Codable, Hashable {
+    let book: String                     // "John"
+    let chapter: Int                     // 3
+    let verseStart: Int                  // 16
+    var verseEnd: Int?                   // 17 (optional for ranges)
+    var text: String?                    // Full text of the scripture
+
+    var reference: String {
+        if let end = verseEnd, end != verseStart {
+            return "\(book) \(chapter):\(verseStart)-\(end)"
+        }
+        return "\(book) \(chapter):\(verseStart)"
+    }
+}
+
+struct SermonQuote: Identifiable, Codable {
+    let id: String
+    let text: String                     // "Faith is not the absence of doubt..."
+    var context: String?                 // When in sermon this was said
+}
+
+/// 52-week phase tracking with cumulative context
+struct WeeklyPhase: Identifiable, Codable {
+    let id: String
+    let churchId: String
+    let weekNumber: Int                  // 1-52
+    let year: Int
+    let startDate: Date                  // Monday
+    let endDate: Date                    // Sunday
+
+    // Sermon for this week
+    var sermonId: String?
+
+    // Cumulative context from all previous weeks
+    var cumulativeThemes: [String]       // All themes from week 1 to this week
+    var cumulativeScriptures: [String]   // All key scriptures covered
+    var keyLearnings: [String]           // AI-summarized learnings so far
+
+    // This week's focus
+    var weeklyFocus: String?             // AI-generated focus statement
+    var suggestedActions: [String]?      // General actions for everyone
+
+    // Progress tracking
+    var memberEngagement: Int?           // % of members engaged this week
+    var actionsCompleted: Int?           // Total actions completed
+}
+
+/// Daily action generated from sermon for a specific member
+struct DailyAction: Identifiable, Codable {
+    let id: String
+    let memberId: String
+    let churchId: String
+    let weekNumber: Int
+    let year: Int
+    let dayOfWeek: Int                   // 1=Monday, 7=Sunday
+    let date: Date
+
+    // Action details
+    let actionType: DailyActionType
+    let title: String                    // "Read John 3:16-17"
+    var description: String?             // Why this matters
+    let estimatedMinutes: Int            // 5, 10, 15, etc.
+
+    // Connection to sermon
+    var sermonConnection: String?        // "Based on this week's message..."
+    var scripture: Scripture?            // If action involves scripture
+
+    // Personalization
+    var stageSpecific: Bool              // True if tailored to member's stage
+    var memberStage: SpiritualStage?     // Stage this was generated for
+
+    // Completion tracking
+    var isCompleted: Bool = false
+    var completedAt: Date?
+    var reflection: String?              // Optional member reflection
+
+    // AI generation metadata
+    var generatedAt: Date
+    var aiContext: String?               // What AI context was used
+}
+
+enum DailyActionType: String, Codable, CaseIterable {
+    case scripture                       // Read Bible passage
+    case prayer                          // Prayer focus
+    case reflection                      // Reflect/journal
+    case application                     // Apply sermon point
+    case outreach                        // Reach out to someone
+    case giving                          // Giving reminder
+    case attendance                      // Attend event/service
+    case serve                           // Serve opportunity
+    case connect                         // Connect with someone
+    case learn                           // Watch/listen to content
+
+    var icon: String {
+        switch self {
+        case .scripture: return "book.fill"
+        case .prayer: return "hands.sparkles.fill"
+        case .reflection: return "pencil.and.outline"
+        case .application: return "lightbulb.fill"
+        case .outreach: return "person.wave.2.fill"
+        case .giving: return "heart.fill"
+        case .attendance: return "calendar"
+        case .serve: return "hand.raised.fill"
+        case .connect: return "person.2.fill"
+        case .learn: return "play.circle.fill"
+        }
+    }
+
+    var displayName: String {
+        switch self {
+        case .scripture: return "Scripture"
+        case .prayer: return "Prayer"
+        case .reflection: return "Reflection"
+        case .application: return "Application"
+        case .outreach: return "Outreach"
+        case .giving: return "Giving"
+        case .attendance: return "Attendance"
+        case .serve: return "Serve"
+        case .connect: return "Connect"
+        case .learn: return "Learn"
+        }
+    }
+}
+
+/// Member's weekly progress
+struct MemberWeeklyProgress: Identifiable, Codable {
+    let id: String
+    let memberId: String
+    let churchId: String
+    let weekNumber: Int
+    let year: Int
+
+    // Completion stats
+    var actionsCompleted: Int
+    var totalActions: Int
+    var streakDays: Int                  // Consecutive days with completed actions
+
+    // Engagement
+    var sermonWatched: Bool
+    var sermonWatchedAt: Date?
+    var attendedService: Bool
+    var attendedServiceAt: Date?
+
+    // Reflections
+    var weeklyReflection: String?
+    var keyTakeaway: String?
+
+    // Timestamps
+    let createdAt: Date
+    var updatedAt: Date?
+
+    var completionPercent: Double {
+        guard totalActions > 0 else { return 0 }
+        return Double(actionsCompleted) / Double(totalActions) * 100
+    }
+}
+
+/// AI-generated insight based on cumulative sermon context
+struct SermonInsight: Identifiable, Codable {
+    let id: String
+    let memberId: String
+    let weekNumber: Int
+    let year: Int
+
+    let insightType: InsightType
+    let title: String                    // "Your Faith Journey"
+    let content: String                  // Full insight text
+    var relatedWeeks: [Int]?             // Weeks this insight connects
+    var relatedScriptures: [Scripture]?
+
+    let generatedAt: Date
+}
+
+enum InsightType: String, Codable {
+    case encouragement                   // "You're doing great!"
+    case connection                      // "This connects to what we learned..."
+    case challenge                       // "Ready for the next step?"
+    case celebration                     // "Look how far you've come!"
+    case recommendation                  // "Based on your journey..."
+}
+
