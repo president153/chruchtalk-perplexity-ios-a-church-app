@@ -7,6 +7,7 @@ struct OutreachHomeView: View {
     @State private var territoriesError: String?
     @State private var showMySouls = false
     @State private var showSRMDashboard = false
+    @State private var showAddSoul = false
 
     // Weekly Assignment (Agentic AI)
     @State private var weeklyAssignment: WeeklyAssignment?
@@ -139,14 +140,17 @@ struct OutreachHomeView: View {
                             }
                         }
                     }
+                    // Bottom padding for tab bar
+                    Color.clear.frame(height: 120)
                 }
                 .padding(.vertical)
             }
             .navigationTitle("Outreach")
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {}) {
-                        Image(systemName: "plus")
+                    Button(action: { showAddSoul = true }) {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.title3)
                             .foregroundColor(.churchTalkRed)
                     }
                 }
@@ -156,6 +160,10 @@ struct OutreachHomeView: View {
             }
             .sheet(isPresented: $showSRMDashboard) {
                 SRMDashboardView()
+                    .environmentObject(authViewModel)
+            }
+            .sheet(isPresented: $showAddSoul) {
+                AddSoulSheet()
                     .environmentObject(authViewModel)
             }
             .task {
@@ -643,6 +651,91 @@ struct WeeklyAssignmentCard: View {
         .cornerRadius(12)
         .shadow(color: Color.black.opacity(0.05), radius: 5, y: 2)
         .padding(.horizontal)
+    }
+}
+
+// MARK: - Add Soul Sheet
+
+struct AddSoulSheet: View {
+    @EnvironmentObject var authViewModel: AuthViewModel
+    @Environment(\.dismiss) var dismiss
+
+    @State private var firstName = ""
+    @State private var lastName = ""
+    @State private var phone = ""
+    @State private var email = ""
+    @State private var notes = ""
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    var isFormValid: Bool {
+        !firstName.trimmingCharacters(in: .whitespaces).isEmpty
+    }
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Contact Info") {
+                    TextField("First Name *", text: $firstName)
+                    TextField("Last Name", text: $lastName)
+                    TextField("Phone", text: $phone)
+                        .keyboardType(.phonePad)
+                    TextField("Email", text: $email)
+                        .keyboardType(.emailAddress)
+                        .autocapitalization(.none)
+                }
+
+                Section("Notes") {
+                    TextEditor(text: $notes)
+                        .frame(minHeight: 80)
+                }
+
+                if let error = errorMessage {
+                    Section {
+                        Text(error)
+                            .foregroundColor(.red)
+                            .font(.caption)
+                    }
+                }
+            }
+            .navigationTitle("Add New Contact")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        Task { await saveSoul() }
+                    }
+                    .disabled(!isFormValid || isSaving)
+                }
+            }
+        }
+    }
+
+    private func saveSoul() async {
+        isSaving = true
+        errorMessage = nil
+
+        do {
+            let request = CreateSoulRequest(
+                firstName: firstName.trimmingCharacters(in: .whitespaces),
+                lastName: lastName.trimmingCharacters(in: .whitespaces),
+                email: email.isEmpty ? nil : email,
+                phone: phone.isEmpty ? nil : phone,
+                soulType: "contact",
+                spiritualStage: 1,
+                notes: notes.isEmpty ? nil : notes
+            )
+            _ = try await SoulsAPI.shared.createSoul(request: request)
+            await MainActor.run { dismiss() }
+        } catch {
+            await MainActor.run {
+                errorMessage = "Failed to save: \(error.localizedDescription)"
+                isSaving = false
+            }
+        }
     }
 }
 

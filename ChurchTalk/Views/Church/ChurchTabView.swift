@@ -156,7 +156,10 @@ struct HomeContentView: View {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 12) {
                                 ForEach(events.prefix(5)) { event in
-                                    CompactEventCard(event: event)
+                                    NavigationLink(destination: EventDetailView(event: event)) {
+                                        CompactEventCard(event: event)
+                                    }
+                                    .buttonStyle(PlainButtonStyle())
                                 }
                             }
                             .padding(.horizontal)
@@ -313,8 +316,11 @@ struct ConnectContentView: View {
                         ChurchSectionHeader(title: "Groups", icon: "person.3.fill")
 
                         ForEach(groups.prefix(3)) { group in
-                            SmallGroupCard(group: group)
-                                .padding(.horizontal)
+                            NavigationLink(destination: GroupsListView()) {
+                                SmallGroupCard(group: group)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .padding(.horizontal)
                         }
 
                         if groups.count > 3 {
