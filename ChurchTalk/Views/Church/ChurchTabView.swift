@@ -17,6 +17,7 @@ struct ChurchTabView: View {
         case prayer = "Prayer"
         case connect = "Connect"
         case serve = "Serve"
+        case outreach = "Outreach"
 
         var icon: String {
             switch self {
@@ -24,6 +25,7 @@ struct ChurchTabView: View {
             case .prayer: return "hands.sparkles.fill"
             case .connect: return "person.2.fill"
             case .serve: return "heart.fill"
+            case .outreach: return "figure.walk"
             }
         }
     }
@@ -68,6 +70,10 @@ struct ChurchTabView: View {
                     // Serve Section
                     ServeContentView()
                         .tag(ChurchSection.serve)
+
+                    // Outreach Section
+                    OutreachContentView()
+                        .tag(ChurchSection.outreach)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
             }
@@ -409,6 +415,14 @@ struct ServeContentView: View {
             }
             .padding(.top, 16)
         }
+    }
+}
+
+// MARK: - Outreach Content
+
+struct OutreachContentView: View {
+    var body: some View {
+        OutreachHomeView()
     }
 }
 
