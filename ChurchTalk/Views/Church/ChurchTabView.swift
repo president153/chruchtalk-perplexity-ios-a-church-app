@@ -93,18 +93,34 @@ struct SectionPill: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 6) {
+            HStack(spacing: 8) {
                 Image(systemName: icon)
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.system(size: 13, weight: .semibold))
                 Text(title)
-                    .font(.subheadline)
-                    .fontWeight(isSelected ? .semibold : .medium)
+                    .font(.system(size: 14, weight: isSelected ? .bold : .medium))
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
-            .background(isSelected ? Color.churchTalkRed : Color(.systemGray6))
-            .foregroundColor(isSelected ? .white : .primary)
-            .cornerRadius(20)
+            .padding(.horizontal, 18)
+            .padding(.vertical, 11)
+            .background(
+                Group {
+                    if isSelected {
+                        LinearGradient(
+                            colors: [Color.churchTalkRed, Color.churchTalkRed.opacity(0.85)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    } else {
+                        Color(.tertiarySystemBackground)
+                    }
+                }
+            )
+            .foregroundColor(isSelected ? .white : .secondary)
+            .clipShape(Capsule())
+            .overlay(
+                Capsule()
+                    .stroke(isSelected ? Color.clear : Color(.separator).opacity(0.3), lineWidth: 0.5)
+            )
+            .shadow(color: isSelected ? Color.churchTalkRed.opacity(0.3) : Color.clear, radius: 4, y: 2)
         }
         .buttonStyle(ScaleButtonStyle())
     }
@@ -154,8 +170,11 @@ struct HomeContentView: View {
                         ChurchSectionHeader(title: "Bulletin", icon: "newspaper.fill")
 
                         ForEach(posts.prefix(5)) { post in
-                            CompactBulletinCard(post: post)
-                                .padding(.horizontal)
+                            NavigationLink(destination: BulletinDetailView(post: post)) {
+                                CompactBulletinCard(post: post)
+                            }
+                            .buttonStyle(PlainButtonStyle())
+                            .padding(.horizontal)
                         }
                     }
                 }
@@ -530,29 +549,69 @@ struct CompactEventCard: View {
         return formatter.string(from: event.startDate)
     }
 
+    var formattedTime: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "h:mm a"
+        return formatter.string(from: event.startDate)
+    }
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text(formattedDate)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundColor(.churchTalkRed)
+        VStack(alignment: .leading, spacing: 10) {
+            // Date badge
+            HStack(spacing: 6) {
+                Image(systemName: "calendar")
+                    .font(.system(size: 10, weight: .semibold))
+                Text(formattedDate)
+                    .font(.system(size: 11, weight: .bold))
+            }
+            .foregroundColor(.white)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 5)
+            .background(
+                Capsule()
+                    .fill(Color.churchTalkRed)
+            )
 
             Text(event.title)
-                .font(.subheadline)
-                .fontWeight(.semibold)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.primary)
                 .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
 
-            if let location = event.location {
-                Label(location.address ?? location.name ?? "Location", systemImage: "mappin")
-                    .font(.caption)
+            Spacer(minLength: 0)
+
+            // Time and location
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 4) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 10))
+                    Text(formattedTime)
+                        .font(.system(size: 11))
+                }
+                .foregroundColor(.secondary)
+
+                if let location = event.location {
+                    HStack(spacing: 4) {
+                        Image(systemName: "mappin")
+                            .font(.system(size: 10))
+                        Text(location.name ?? "Location")
+                            .font(.system(size: 11))
+                            .lineLimit(1)
+                    }
                     .foregroundColor(.secondary)
+                }
             }
         }
-        .padding()
-        .frame(width: 160, alignment: .leading)
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.05), radius: 5, y: 2)
+        .padding(14)
+        .frame(width: 170, height: 150, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.secondarySystemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
+        )
     }
 }
 
@@ -560,37 +619,53 @@ struct CompactBulletinCard: View {
     let post: BulletinPost
 
     var body: some View {
-        HStack(spacing: 12) {
-            // Thumbnail or icon
-            Circle()
-                .fill(Color.churchTalkRed.opacity(0.1))
-                .frame(width: 44, height: 44)
+        HStack(spacing: 14) {
+            // Modern gradient icon
+            RoundedRectangle(cornerRadius: 12)
+                .fill(
+                    LinearGradient(
+                        colors: [Color.churchTalkRed, Color.churchTalkRed.opacity(0.7)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .frame(width: 48, height: 48)
                 .overlay(
-                    Image(systemName: "newspaper.fill")
-                        .foregroundColor(.churchTalkRed)
+                    Image(systemName: "doc.text.fill")
+                        .font(.system(size: 20, weight: .medium))
+                        .foregroundColor(.white)
                 )
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(post.title)
-                    .font(.subheadline)
-                    .fontWeight(.medium)
-                    .lineLimit(1)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
 
-                Text(post.publishedAt.timeAgoDisplay())
-                    .font(.caption)
-                    .foregroundColor(.secondary)
+                HStack(spacing: 6) {
+                    Image(systemName: "clock")
+                        .font(.system(size: 10))
+                    Text(post.publishedAt.timeAgoDisplay())
+                        .font(.system(size: 12))
+                }
+                .foregroundColor(.secondary)
             }
 
             Spacer()
 
             Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(.secondary)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(Color(.tertiaryLabel))
         }
-        .padding()
-        .background(Color(.systemBackground))
-        .cornerRadius(12)
-        .shadow(color: Color.black.opacity(0.03), radius: 3, y: 1)
+        .padding(14)
+        .background(
+            RoundedRectangle(cornerRadius: 16)
+                .fill(Color(.secondarySystemBackground))
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 16)
+                .stroke(Color(.separator).opacity(0.3), lineWidth: 0.5)
+        )
     }
 }
 
