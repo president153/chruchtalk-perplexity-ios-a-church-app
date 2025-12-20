@@ -14,12 +14,8 @@ struct MainTabView: View {
             case 0:
                 WeeklyFocusView()
             case 1:
-                HomeView()
+                ChurchTabView()
             case 2:
-                ConnectTabView()
-            case 3:
-                ServeTabView()
-            case 4:
                 ProfileTabView(isAdmin: isAdmin)
             default:
                 WeeklyFocusView()
@@ -54,11 +50,10 @@ struct MainTabView: View {
 struct FloatingTabBar: View {
     @Binding var selectedTab: Int
 
+    // Simplified to 3 tabs: This Week, Church, Profile
     let tabs: [(icon: String, selectedIcon: String, title: String)] = [
-        ("sparkles", "sparkles", "Focus"),
-        ("house", "house.fill", "Home"),
-        ("bubble.left.and.bubble.right", "bubble.left.and.bubble.right.fill", "Connect"),
-        ("hands.clap", "hands.clap.fill", "Serve"),
+        ("sparkles", "sparkles", "This Week"),
+        ("building.2", "building.2.fill", "Church"),
         ("person.circle", "person.circle.fill", "Profile")
     ]
 
@@ -77,14 +72,14 @@ struct FloatingTabBar: View {
                 }
             }
         }
-        .padding(.horizontal, 4)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 8)
         .background(
-            RoundedRectangle(cornerRadius: 22)
+            RoundedRectangle(cornerRadius: 24)
                 .fill(.ultraThinMaterial)
                 .shadow(color: .black.opacity(0.12), radius: 8, y: 3)
         )
-        .padding(.horizontal, 24)
+        .padding(.horizontal, 40)
         .padding(.bottom, 12)
     }
 }

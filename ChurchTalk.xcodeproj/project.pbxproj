@@ -24,6 +24,7 @@
 		23D36F87029C5711B7C5CAD2 /* KeyboardHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = CB9235F91A3577D4DF0F8004 /* KeyboardHelper.swift */; };
 		2442C774445E7C9C0834B8B1 /* TermsPrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA9F7870F977A2D5BA628A9C /* TermsPrivacyView.swift */; };
 		2456DFDE827DDBACBE364DB7 /* ChurchContactSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0A0A1D4E10AB117CF4A71384 /* ChurchContactSection.swift */; };
+		CHURCHTAB001BUILDFILE00001 /* ChurchTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CHURCHTAB001FILEREF000001 /* ChurchTabView.swift */; };
 		26761F348ADD5D18A63E5138 /* ChurchSocialLinksBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C9FF70A670C1EC828B6C550 /* ChurchSocialLinksBar.swift */; };
 		29411996A1DF0640B70BA0E7 /* Animations.swift in Sources */ = {isa = PBXBuildFile; fileRef = C056A1A9AE392C7690E4ECC9 /* Animations.swift */; };
 		294662C7CA32427FACEF3C34 /* TokenManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C168CB2E7F821C0C0642F07 /* TokenManager.swift */; };
@@ -128,6 +129,7 @@
 
 /* Begin PBXFileReference section */
 		0A0A1D4E10AB117CF4A71384 /* ChurchContactSection.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChurchContactSection.swift; path = ChurchTalk/Views/Church/ChurchContactSection.swift; sourceTree = SOURCE_ROOT; };
+		CHURCHTAB001FILEREF000001 /* ChurchTabView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; name = ChurchTabView.swift; path = ChurchTalk/Views/Church/ChurchTabView.swift; sourceTree = SOURCE_ROOT; };
 		17B6AA3261A69893417F7AD4 /* HomeView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
 		18761C115C3CCF29A146C4BF /* BulletinDetailView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = BulletinDetailView.swift; sourceTree = "<group>"; };
 		1C0821D86C59DF553BD07449 /* AppDelegate.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -331,6 +333,7 @@
 				0A0A1D4E10AB117CF4A71384 /* ChurchContactSection.swift */,
 				5C9FF70A670C1EC828B6C550 /* ChurchSocialLinksBar.swift */,
 				EAC92152F39FDC4B5463351C /* ChurchServiceTimesView.swift */,
+				CHURCHTAB001FILEREF000001 /* ChurchTabView.swift */,
 			);
 			name = Church;
 			path = ChurchTalk/Views/Church;
@@ -773,6 +776,7 @@
 				2456DFDE827DDBACBE364DB7 /* ChurchContactSection.swift in Sources */,
 				26761F348ADD5D18A63E5138 /* ChurchSocialLinksBar.swift in Sources */,
 				4E3C1AE5DFB67D1134745E97 /* ChurchServiceTimesView.swift in Sources */,
+				CHURCHTAB001BUILDFILE00001 /* ChurchTabView.swift in Sources */,
 				ADE07B6B7B639B7B98CAE1C2 /* EventsTabView.swift in Sources */,
 				D3536C8FADF4E873195B8AD2 /* EventListView.swift in Sources */,
 				7F53EA44D35E585A4E0BAD35 /* EventCalendarView.swift in Sources */,
