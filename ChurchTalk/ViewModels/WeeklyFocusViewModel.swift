@@ -45,6 +45,16 @@ class WeeklyFocusViewModel: ObservableObject {
 
         do {
             weeklyFocus = try await focusTask
+        } catch let apiError as APIError {
+            // 404 means no weekly focus published - this is expected, not an error
+            if case .notFound = apiError {
+                print("No weekly focus published for this week")
+                weeklyFocus = nil
+                // Don't set error - the view will show emptySection
+            } else {
+                print("Failed to fetch weekly focus: \(apiError)")
+                self.error = "Unable to load weekly focus"
+            }
         } catch {
             print("Failed to fetch weekly focus: \(error)")
             self.error = "Unable to load weekly focus"

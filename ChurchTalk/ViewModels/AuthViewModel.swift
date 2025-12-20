@@ -146,6 +146,11 @@ class AuthViewModel: ObservableObject {
         showError = false
         errorMessage = nil
 
+        // Clear any stale auth tokens before login attempt
+        // This prevents sending invalid tokens with the login request
+        APIClient.shared.authToken = nil
+        KeychainService.shared.accessToken = nil
+
         do {
             let response = try await AuthAPI.shared.login(email: email, password: password)
 

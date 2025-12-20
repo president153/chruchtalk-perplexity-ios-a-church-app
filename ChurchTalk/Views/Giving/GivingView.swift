@@ -77,13 +77,13 @@ private struct OverviewTab: View {
 
                 // Stats Cards
                 HStack(spacing: 12) {
-                    StatCard(
+                    GivingStatCard(
                         title: "Year to Date",
                         value: viewModel.formattedYearlyTotal,
                         icon: "chart.line.uptrend.xyaxis"
                     )
 
-                    StatCard(
+                    GivingStatCard(
                         title: "Recurring/Mo",
                         value: viewModel.formattedMonthlyRecurringTotal,
                         icon: "repeat"
@@ -260,7 +260,7 @@ private struct GiveNowCard: View {
     }
 }
 
-private struct StatCard: View {
+private struct GivingStatCard: View {
     let title: String
     let value: String
     let icon: String
@@ -362,14 +362,14 @@ private struct DonationDetailRow: View {
             VStack(alignment: .trailing, spacing: 4) {
                 Text(donation.formattedAmount)
                     .font(.headline)
-                StatusBadge(status: donation.donationStatus)
+                DonationStatusBadge(status: donation.donationStatus)
             }
         }
         .padding(.vertical, 4)
     }
 }
 
-private struct StatusBadge: View {
+private struct DonationStatusBadge: View {
     let status: DonationStatus
 
     var body: some View {

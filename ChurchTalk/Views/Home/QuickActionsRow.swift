@@ -21,7 +21,7 @@ struct QuickActionsRow: View {
             HStack(spacing: 16) {
                 QuickActionButton(
                     title: "Bible",
-                    icon: "book.fill",
+                    icon: "book.closed.fill",
                     color: .purple
                 ) {
                     showBibleSheet = true
@@ -29,7 +29,7 @@ struct QuickActionsRow: View {
 
                 QuickActionButton(
                     title: "Prayer",
-                    icon: "hands.sparkles.fill",
+                    icon: "hands.and.sparkles.fill",
                     color: .churchTalkRed
                 ) {
                     showPrayerSheet = true
@@ -37,7 +37,7 @@ struct QuickActionsRow: View {
 
                 QuickActionButton(
                     title: "Give",
-                    icon: "heart.fill",
+                    icon: "dollarsign.circle.fill",
                     color: .green
                 ) {
                     showGiveSheet = true
@@ -45,7 +45,7 @@ struct QuickActionsRow: View {
 
                 QuickActionButton(
                     title: "Events",
-                    icon: "calendar",
+                    icon: "calendar.badge.clock",
                     color: .blue
                 ) {
                     showEventsSheet = true
@@ -53,7 +53,7 @@ struct QuickActionsRow: View {
 
                 QuickActionButton(
                     title: "Watch",
-                    icon: "play.rectangle.fill",
+                    icon: "play.tv.fill",
                     color: .red
                 ) {
                     showWatchSheet = true
@@ -61,7 +61,7 @@ struct QuickActionsRow: View {
 
                 QuickActionButton(
                     title: "Connect",
-                    icon: "person.2.fill",
+                    icon: "bubble.left.and.bubble.right.fill",
                     color: .orange
                 ) {
                     showConnectSheet = true
@@ -76,16 +76,16 @@ struct QuickActionsRow: View {
             EventsTabView()
         }
         .sheet(isPresented: $showGiveSheet) {
-            GiveSheet()
+            GivingView()
         }
         .sheet(isPresented: $showBibleSheet) {
             BibleSheet()
         }
         .sheet(isPresented: $showWatchSheet) {
-            WatchSheet()
+            WatchView()
         }
         .sheet(isPresented: $showConnectSheet) {
-            ConnectSheet()
+            GroupsListView()
         }
     }
 }

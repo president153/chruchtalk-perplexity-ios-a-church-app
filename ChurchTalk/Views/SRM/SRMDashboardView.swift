@@ -125,8 +125,8 @@ struct SRMDashboardView: View {
         errorMessage = nil
 
         do {
-            // Load all shared souls for the church (admin view)
-            let fetchedSouls = try await SoulsAPI.shared.getSouls(shareStatus: "shared", limit: 500)
+            // Load user's own souls (my souls view)
+            let fetchedSouls = try await SoulsAPI.shared.getSouls(view: "mine", limit: 100)
             await MainActor.run {
                 souls = fetchedSouls
                 stats = SRMStats.calculate(from: souls)

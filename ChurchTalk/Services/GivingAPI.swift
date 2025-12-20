@@ -28,8 +28,8 @@ final class GivingAPI {
 
     /// List all active funds for the church
     func listFunds() async throws -> [Fund] {
-        let response: FundsListResponse = try await APIClient.shared.get("/giving/funds?active_only=true")
-        return response.funds.map { $0.toFund() }
+        let response: [FundResponse] = try await APIClient.shared.get("/giving/funds?active_only=true")
+        return response.map { $0.toFund() }
     }
 
     // MARK: - My Donations
@@ -41,16 +41,16 @@ final class GivingAPI {
             endpoint += "&year=\(year)"
         }
 
-        let response: DonationsListResponse = try await APIClient.shared.get(endpoint)
-        return response.donations.map { $0.toDonation() }
+        let response: [DonationResponse] = try await APIClient.shared.get(endpoint)
+        return response.map { $0.toDonation() }
     }
 
     // MARK: - My Recurring Givings
 
     /// Get my recurring giving subscriptions
     func getMyRecurringGivings() async throws -> [RecurringGiving] {
-        let response: RecurringGivingsListResponse = try await APIClient.shared.get("/giving/recurring/my")
-        return response.recurringGivings.map { $0.toRecurringGiving() }
+        let response: [RecurringGivingResponse] = try await APIClient.shared.get("/giving/recurring/my")
+        return response.map { $0.toRecurringGiving() }
     }
 
     /// Cancel a recurring giving

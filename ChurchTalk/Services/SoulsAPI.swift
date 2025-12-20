@@ -66,22 +66,24 @@ class SoulsAPI {
 
     // MARK: - List Souls
 
-    /// Get list of souls (filtered by current user by default)
+    /// Get list of souls based on view type
     /// - Parameters:
-    ///   - mine: If true, only returns souls added by current user
-    ///   - shareStatus: Filter by share status
+    ///   - view: View type - "mine" (default), "shared", or "all"
+    ///   - soulType: Optional filter by soul type
+    ///   - shareStatus: Optional filter by share status
     ///   - skip: Number of records to skip (pagination)
     ///   - limit: Maximum records to return
     /// - Returns: Array of souls
     func getSouls(
-        mine: Bool = false,
+        view: String = "mine",
+        soulType: String? = nil,
         shareStatus: String? = nil,
         skip: Int = 0,
         limit: Int = 50
     ) async throws -> [Soul] {
-        var endpoint = "/souls?skip=\(skip)&limit=\(limit)"
-        if mine {
-            endpoint += "&mine=true"
+        var endpoint = "/souls?view=\(view)&skip=\(skip)&limit=\(limit)"
+        if let type = soulType {
+            endpoint += "&soul_type=\(type)"
         }
         if let status = shareStatus {
             endpoint += "&share_status=\(status)"

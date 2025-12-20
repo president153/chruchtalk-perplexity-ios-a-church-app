@@ -47,240 +47,18 @@ struct EditProfileView: View {
         NavigationStack {
             ZStack {
                 Form {
-                    // Profile Photo Section
-                    Section {
-                        HStack {
-                            Spacer()
-
-                            PhotosPicker(selection: $selectedPhoto, matching: .images) {
-                                ZStack(alignment: .bottomTrailing) {
-                                    if let profileImage {
-                                        profileImage
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: 100, height: 100)
-                                            .clipShape(Circle())
-                                    } else {
-                                        Circle()
-                                            .fill(Color.churchTalkRed.opacity(0.2))
-                                            .frame(width: 100, height: 100)
-                                            .overlay(
-                                                Text("\(firstName.prefix(1))\(lastName.prefix(1))")
-                                                    .font(.largeTitle)
-                                                    .fontWeight(.bold)
-                                                    .foregroundColor(.churchTalkRed)
-                                            )
-                                    }
-
-                                    Circle()
-                                        .fill(Color.churchTalkRed)
-                                        .frame(width: 32, height: 32)
-                                        .overlay(
-                                            Image(systemName: "camera.fill")
-                                                .font(.caption)
-                                                .foregroundColor(.white)
-                                        )
-                                }
-                            }
-                            .onChange(of: selectedPhoto) { _, newValue in
-                                Task {
-                                    if let data = try? await newValue?.loadTransferable(type: Data.self),
-                                       let uiImage = UIImage(data: data) {
-                                        profileImage = Image(uiImage: uiImage)
-                                        selectedImageData = data
-                                    }
-                                }
-                            }
-
-                            Spacer()
-                        }
-                        .listRowBackground(Color.clear)
-                    }
-
-                    // Personal Information
-                    Section("Personal Information") {
-                        HStack {
-                            Text("First Name")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            TextField("First Name", text: $firstName)
-                                .multilineTextAlignment(.trailing)
-                        }
-
-                        HStack {
-                            Text("Last Name")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            TextField("Last Name", text: $lastName)
-                                .multilineTextAlignment(.trailing)
-                        }
-
-                        HStack {
-                            Text("Email")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text(email)
-                                .foregroundColor(.primary.opacity(0.6))
-                        }
-
-                        HStack {
-                            Text("Phone")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            TextField("Phone", text: $phone)
-                                .multilineTextAlignment(.trailing)
-                                .keyboardType(.phonePad)
-                        }
-
-                        Button(action: { showDatePicker = true }) {
-                            HStack {
-                                Text("Date of Birth")
-                                    .foregroundColor(.secondary)
-                                Spacer()
-                                Text(dateOfBirth.formatted(date: .abbreviated, time: .omitted))
-                                    .foregroundColor(.primary)
-                                Image(systemName: "calendar")
-                                    .foregroundColor(.churchTalkRed)
-                            }
-                        }
-
-                        HStack {
-                            Text("Age")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            Text("\(calculateAge()) years old")
-                                .foregroundColor(.primary)
-                        }
-                    }
-
-                    // Address
-                    Section("Address") {
-                        HStack {
-                            Text("Street")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            TextField("123 Main St", text: $street)
-                                .multilineTextAlignment(.trailing)
-                        }
-
-                        HStack {
-                            Text("City")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            TextField("City", text: $city)
-                                .multilineTextAlignment(.trailing)
-                        }
-
-                        HStack {
-                            Text("State")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            TextField("CA", text: $state)
-                                .multilineTextAlignment(.trailing)
-                                .textInputAutocapitalization(.characters)
-                        }
-
-                        HStack {
-                            Text("ZIP Code")
-                                .foregroundColor(.secondary)
-                            Spacer()
-                            TextField("12345", text: $zipCode)
-                                .multilineTextAlignment(.trailing)
-                                .keyboardType(.numberPad)
-                        }
-
-                        // Map Preview (like Apple Contacts)
-                        if let coordinate = addressCoordinate {
-                            Map(position: .constant(.region(mapRegion))) {
-                                Marker("", coordinate: coordinate)
-                                    .tint(.churchTalkRed)
-                            }
-                            .frame(height: 150)
-                            .cornerRadius(12)
-                            .allowsHitTesting(false)
-                        }
-
-                        // Geocode button
-                        if !street.isEmpty && !city.isEmpty && !state.isEmpty {
-                            Button {
-                                geocodeAddress()
-                            } label: {
-                                HStack {
-                                    Image(systemName: "location.magnifyingglass")
-                                    Text(addressCoordinate == nil ? "Show on Map" : "Update Map")
-                                }
-                                .font(.subheadline)
-                                .foregroundColor(.churchTalkRed)
-                            }
-                        }
-                    }
-
-                    // Spiritual Journey
-                    Section("Faith Journey") {
-                        Button(action: { showSpiritualJourney = true }) {
-                            HStack {
-                                Image(systemName: "arrow.triangle.branch")
-                                    .foregroundColor(.churchTalkRed)
-                                Text("Spiritual Journey")
-                                Spacer()
-                                if let stage = authViewModel.currentMember?.spiritualJourney?.currentStage {
-                                    Text("Stage \(stage)")
-                                        .foregroundColor(.secondary)
-                                }
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .foregroundColor(.primary)
-                    }
-
-                    // Family
-                    Section("Family") {
-                        Button(action: { showFamilyManagement = true }) {
-                            HStack {
-                                Image(systemName: "person.3.fill")
-                                    .foregroundColor(.churchTalkRed)
-                                Text("Manage Family Members")
-                                Spacer()
-                                Image(systemName: "chevron.right")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
-                        .foregroundColor(.primary)
-                    }
-
-                    // Milestones
-                    Section("Milestones") {
-                        MilestoneRow(
-                            icon: "cross.fill",
-                            title: "Salvation",
-                            date: authViewModel.currentMember?.spiritualJourney?.salvationDate
-                        )
-                        MilestoneRow(
-                            icon: "drop.fill",
-                            title: "Baptism",
-                            date: authViewModel.currentMember?.spiritualJourney?.baptismDate
-                        )
-                        MilestoneRow(
-                            icon: "person.crop.circle.badge.checkmark",
-                            title: "Membership",
-                            date: authViewModel.currentMember?.spiritualJourney?.membershipDate
-                        )
-                    }
+                    profilePhotoSection
+                    personalInfoSection
+                    addressSection
+                    faithJourneySection
+                    familySection
+                    milestonesSection
                 }
                 .disabled(isSaving)
                 .opacity(isSaving ? 0.6 : 1)
 
-                // Loading overlay
                 if isSaving {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                    ProgressView("Saving...")
-                        .padding()
-                        .background(Color(.systemBackground))
-                        .cornerRadius(12)
+                    loadingOverlay
                 }
             }
             .navigationTitle("Edit Profile")
@@ -323,6 +101,235 @@ struct EditProfileView: View {
             }
         }
     }
+
+    // MARK: - Extracted Sections
+
+    private var profilePhotoSection: some View {
+        Section {
+            HStack {
+                Spacer()
+                PhotosPicker(selection: $selectedPhoto, matching: .images) {
+                    ZStack(alignment: .bottomTrailing) {
+                        if let profileImage {
+                            profileImage
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 100, height: 100)
+                                .clipShape(Circle())
+                        } else {
+                            Circle()
+                                .fill(Color.churchTalkRed.opacity(0.2))
+                                .frame(width: 100, height: 100)
+                                .overlay(
+                                    Text("\(firstName.prefix(1))\(lastName.prefix(1))")
+                                        .font(.largeTitle)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.churchTalkRed)
+                                )
+                        }
+                        Circle()
+                            .fill(Color.churchTalkRed)
+                            .frame(width: 32, height: 32)
+                            .overlay(
+                                Image(systemName: "camera.fill")
+                                    .font(.caption)
+                                    .foregroundColor(.white)
+                            )
+                    }
+                }
+                .onChange(of: selectedPhoto) { _, newValue in
+                    Task {
+                        if let data = try? await newValue?.loadTransferable(type: Data.self),
+                           let uiImage = UIImage(data: data) {
+                            profileImage = Image(uiImage: uiImage)
+                            selectedImageData = data
+                        }
+                    }
+                }
+                Spacer()
+            }
+            .listRowBackground(Color.clear)
+        }
+    }
+
+    private var personalInfoSection: some View {
+        Section("Personal Information") {
+            HStack {
+                Text("First Name")
+                    .foregroundColor(.secondary)
+                Spacer()
+                TextField("First Name", text: $firstName)
+                    .multilineTextAlignment(.trailing)
+            }
+            HStack {
+                Text("Last Name")
+                    .foregroundColor(.secondary)
+                Spacer()
+                TextField("Last Name", text: $lastName)
+                    .multilineTextAlignment(.trailing)
+            }
+            HStack {
+                Text("Email")
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text(email)
+                    .foregroundColor(.primary.opacity(0.6))
+            }
+            HStack {
+                Text("Phone")
+                    .foregroundColor(.secondary)
+                Spacer()
+                TextField("Phone", text: $phone)
+                    .multilineTextAlignment(.trailing)
+                    .keyboardType(.phonePad)
+            }
+            Button(action: { showDatePicker = true }) {
+                HStack {
+                    Text("Date of Birth")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text(dateOfBirth.formatted(date: .abbreviated, time: .omitted))
+                        .foregroundColor(.primary)
+                    Image(systemName: "calendar")
+                        .foregroundColor(.churchTalkRed)
+                }
+            }
+            HStack {
+                Text("Age")
+                    .foregroundColor(.secondary)
+                Spacer()
+                Text("\(calculateAge()) years old")
+                    .foregroundColor(.primary)
+            }
+        }
+    }
+
+    private var addressSection: some View {
+        Section("Address") {
+            HStack {
+                Text("Street")
+                    .foregroundColor(.secondary)
+                Spacer()
+                TextField("123 Main St", text: $street)
+                    .multilineTextAlignment(.trailing)
+            }
+            HStack {
+                Text("City")
+                    .foregroundColor(.secondary)
+                Spacer()
+                TextField("City", text: $city)
+                    .multilineTextAlignment(.trailing)
+            }
+            HStack {
+                Text("State")
+                    .foregroundColor(.secondary)
+                Spacer()
+                TextField("CA", text: $state)
+                    .multilineTextAlignment(.trailing)
+                    .textInputAutocapitalization(.characters)
+            }
+            HStack {
+                Text("ZIP Code")
+                    .foregroundColor(.secondary)
+                Spacer()
+                TextField("12345", text: $zipCode)
+                    .multilineTextAlignment(.trailing)
+                    .keyboardType(.numberPad)
+            }
+            if let coordinate = addressCoordinate {
+                Map(position: .constant(.region(mapRegion))) {
+                    Marker("", coordinate: coordinate)
+                        .tint(.red)
+                }
+                .frame(height: 150)
+                .cornerRadius(12)
+                .allowsHitTesting(false)
+            }
+            if !street.isEmpty && !city.isEmpty && !state.isEmpty {
+                Button {
+                    geocodeAddress()
+                } label: {
+                    HStack {
+                        Image(systemName: "location.magnifyingglass")
+                        Text(addressCoordinate == nil ? "Show on Map" : "Update Map")
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.churchTalkRed)
+                }
+            }
+        }
+    }
+
+    private var faithJourneySection: some View {
+        Section("Faith Journey") {
+            Button(action: { showSpiritualJourney = true }) {
+                HStack {
+                    Image(systemName: "arrow.triangle.branch")
+                        .foregroundColor(.churchTalkRed)
+                    Text("Spiritual Journey")
+                    Spacer()
+                    if let stage = authViewModel.currentMember?.spiritualJourney?.currentStage {
+                        Text("Stage \(stage)")
+                            .foregroundColor(.secondary)
+                    }
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .foregroundColor(.primary)
+        }
+    }
+
+    private var familySection: some View {
+        Section("Family") {
+            Button(action: { showFamilyManagement = true }) {
+                HStack {
+                    Image(systemName: "person.3.fill")
+                        .foregroundColor(.churchTalkRed)
+                    Text("Manage Family Members")
+                    Spacer()
+                    Image(systemName: "chevron.right")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .foregroundColor(.primary)
+        }
+    }
+
+    private var milestonesSection: some View {
+        Section("Milestones") {
+            MilestoneRow(
+                icon: "cross.fill",
+                title: "Salvation",
+                date: authViewModel.currentMember?.spiritualJourney?.salvationDate
+            )
+            MilestoneRow(
+                icon: "drop.fill",
+                title: "Baptism",
+                date: authViewModel.currentMember?.spiritualJourney?.baptismDate
+            )
+            MilestoneRow(
+                icon: "person.crop.circle.badge.checkmark",
+                title: "Membership",
+                date: authViewModel.currentMember?.spiritualJourney?.membershipDate
+            )
+        }
+    }
+
+    private var loadingOverlay: some View {
+        ZStack {
+            Color.black.opacity(0.3)
+                .ignoresSafeArea()
+            ProgressView("Saving...")
+                .padding()
+                .background(Color(.systemBackground))
+                .cornerRadius(12)
+        }
+    }
+
+    // MARK: - Data Management
 
     private func loadCurrentData() {
         guard let member = authViewModel.currentMember else { return }

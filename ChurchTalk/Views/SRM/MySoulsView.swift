@@ -170,7 +170,7 @@ struct MySoulsView: View {
         errorMessage = nil
 
         do {
-            let fetchedSouls = try await SoulsAPI.shared.getSouls(mine: true, limit: 100)
+            let fetchedSouls = try await SoulsAPI.shared.getSouls(view: "mine", limit: 100)
             await MainActor.run {
                 mySouls = fetchedSouls
                 isLoading = false

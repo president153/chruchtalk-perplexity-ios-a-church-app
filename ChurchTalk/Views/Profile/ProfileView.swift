@@ -227,7 +227,7 @@ struct ProfileView: View {
 
         // Load souls count
         do {
-            let souls = try await SoulsAPI.shared.getSouls(mine: true, limit: 1000)
+            let souls = try await SoulsAPI.shared.getSouls(view: "mine", limit: 100)
             await MainActor.run {
                 soulsAdded = souls.count
             }
